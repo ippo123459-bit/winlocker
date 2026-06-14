@@ -2,7 +2,7 @@ import ctypes, os, sys, time, threading, random, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
-TIMER_SECONDS = 15  # для теста, потом 0 для мгновенной активации
+TIMER_SECONDS = 15
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
