@@ -94,30 +94,7 @@ class WinLocker:
             self.canvas.itemconfig(self.status, text="НЕВЕРНЫЙ ПАРОЛЬ!")
             self.entry.delete(0, tk.END)
     
-    def draw_reaper(self, x, y, frame):
-        """Рисует ASCII Смерть с косой"""
-        import math
-        # Заменил двойные кавычки на одинарные, чтобы не было ошибки
-        lines = [
-            '     .-"-.\'',
-            '    /|6 6|\\',
-            '   {/(_0_)\\}',
-            '    _/ ^ \\_',
-            '   (/ /^\\ \\)-',
-            '     ""\' \'""'
-        ]
-        angle = frame * 0.1
-        end_x = x + int(40 * math.cos(angle))
-        end_y = y + int(40 * math.sin(angle))
-        self.canvas.create_line(x, y, end_x, end_y, fill='white', width=2)
-        for i, line in enumerate(lines):
-            self.canvas.create_text(x, y + i * 20, text=line, fill='white', font=('Courier', 16), tags="reaper")
-    
     def animate(self):
-        self.canvas.delete("reaper")
-        import math
-        self.draw_reaper(400, 500, int(time.time() * 10))
-        
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='gray')
         else:
