@@ -14,11 +14,9 @@ PASSWORD = "1601"
 TIMER_SECONDS = 15   # стартовый таймер (0 — если из автозагрузки)
 # ============================================================
 
-# Скрываем окно CMD при запуске
-try:
-    ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
-except:
-    pass
+# ---------- СКРЫВАЕМ КОНСОЛЬ ----------
+# Эта магия полностью прячет окно CMD при запуске
+ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
 
 # ---------- глобальная блокировка клавиатуры/мыши ----------
 def block_input(block=True):
