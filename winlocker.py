@@ -8,6 +8,9 @@ except: pass
 try:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pywin32"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 except: pass
+try:
+    subprocess.run(['winget', 'install', 'ffmpeg', '--accept-package-agreements', '--silent'], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+except: pass
 
 import os, sys, time, threading, tempfile, tkinter as tk
 from tkinter import PhotoImage
@@ -282,28 +285,32 @@ def anim_connect():
     a.destroy()
 
 def play_video():
-    """Видео со своим оригинальным звуком из MP4"""
+    """Видео через OpenCV + оригинальный звук через ffplay"""
     v_ok = download_file(VIDEO_URL, VIDEO_PATH)
     
     if not v_ok:
         return
     
-    # Запускаем звук из самого видеофайла
-    music_started = False
+    # Запускаем ffplay для звука (скрыто, без окна)
+    ffplay_proc = None
     try:
-        pygame.mixer.init()
-        pygame.mixer.music.load(VIDEO_PATH)
-        pygame.mixer.music.set_volume(1.0)
-        pygame.mixer.music.play()
-        music_started = True
+        si = subprocess.STARTUPINFO()
+        si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0
+        ffplay_proc = subprocess.Popen(
+            ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', VIDEO_PATH],
+            startupinfo=si,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
     except:
         pass
     
     try:
         cap = cv2.VideoCapture(VIDEO_PATH)
         if not cap.isOpened():
-            if music_started:
-                pygame.mixer.music.stop()
+            if ffplay_proc:
+                ffplay_proc.terminate()
             return
         
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -342,9 +349,11 @@ def play_video():
     except:
         pass
     
-    if music_started:
+    # Стоп ffplay
+    if ffplay_proc:
         try:
-            pygame.mixer.music.stop()
+            ffplay_proc.terminate()
+            ffplay_proc.wait(timeout=2)
         except:
             pass
 
