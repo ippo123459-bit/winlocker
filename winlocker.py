@@ -104,17 +104,14 @@ def anim():
 def video():
     if not dl(VIDEO_URL,V): return
     time.sleep(0.5)
-    sound_ok = False
     try:
         pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
         pygame.mixer.music.load(V)
         pygame.mixer.music.set_volume(1.0)
         pygame.mixer.music.play()
-        sound_ok = True
     except:
         try:
             subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet',V], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
-            sound_ok = True
         except: pass
     try:
         cap=cv2.VideoCapture(V)
